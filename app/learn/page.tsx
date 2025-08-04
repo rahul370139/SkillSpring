@@ -52,45 +52,15 @@ export default function LearnPage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleGenerateLesson = async () => {
-    if (selectedFiles.length === 0) return
-    
+  const handleGenerateLesson = () => {
     setIsGenerating(true)
-    try {
-      // Process the first PDF file
-      const file = selectedFiles[0]
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("owner_id", "user-123") // Replace with actual user ID
-      formData.append("explanation_level", appliedExperienceLevel)
-      formData.append("framework", appliedFramework)
-
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/distill", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        toast({
-          title: "Lesson Generated!",
-          description: "Your micro-lesson has been created based on the uploaded files.",
-        })
-        // You can store the result or display it in the chat
-      } else {
-        throw new Error("Failed to process PDF")
-      }
-    } catch (error) {
-      console.error("PDF processing failed:", error)
-      toast({
-        title: "Error",
-        description: "Failed to process PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
+    setTimeout(() => {
       setIsGenerating(false)
-    }
-  }    }, 2000)
+      toast({
+        title: "Lesson Generated!",
+        description: "Your micro-lesson has been created based on the uploaded files.",
+      })
+    }, 2000)
   }
 
   const handleApplySettings = () => {
@@ -119,8 +89,8 @@ export default function LearnPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="space-y-6">
-        <APITest />        {/* Header */}
-        <BackendTest />        <div className="text-center space-y-3">
+        {/* Header */}
+        <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             AI-Powered Learning Hub
           </h1>
@@ -244,8 +214,8 @@ export default function LearnPage() {
 
           {/* Settings Sidebar */}
           <div className="space-y-6">
-        <APITest />            <Card className="shadow-lg bg-background border">
-        <BackendTest />              <CardHeader className="pb-4">
+            <Card className="shadow-lg bg-background border">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Settings className="h-5 w-5" />
