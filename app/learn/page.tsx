@@ -119,7 +119,7 @@ export default function LearnPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="space-y-6">
-        {/* Header */}
+        <APITest />        {/* Header */}
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             AI-Powered Learning Hub
@@ -244,7 +244,7 @@ export default function LearnPage() {
 
           {/* Settings Sidebar */}
           <div className="space-y-6">
-            <Card className="shadow-lg bg-background border">
+        <APITest />            <Card className="shadow-lg bg-background border">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
