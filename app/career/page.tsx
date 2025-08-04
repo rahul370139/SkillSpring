@@ -177,11 +177,44 @@ export default function CareerPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < assessmentQuestions.length - 1) {
       setCurrentStep((prev) => prev + 1)
     } else {
       setIsLoading(true)
+      try {
+        const answersArray = Object.values(answers).map(answer => parseInt(answer))
+        
+        const response = await fetch("https://trainbackend-production.up.railway.app/api/career/match", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            answers: answersArray,
+            owner_id: "user-123",
+            user_profile: {
+              experience_level: "beginner",
+              interests: ["technology", "problem-solving"]
+            }
+          }),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log("Career matches:", result)
+          setIsLoading(false)
+          setShowResults(true)
+        } else {
+          throw new Error("Career matching failed")
+        }
+      } catch (error) {
+        console.error("Career matching failed:", error)
+        setIsLoading(false)
+        setShowResults(true)
+      }
+    }
+  }      setIsLoading(true)
       setTimeout(() => {
         setIsLoading(false)
         setShowResults(true)

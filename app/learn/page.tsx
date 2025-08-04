@@ -52,15 +52,44 @@ export default function LearnPage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleGenerateLesson = () => {
+  const handleGenerateLesson = async () => {
+    if (selectedFiles.length === 0) return
+    
     setIsGenerating(true)
-    setTimeout(() => {
-      setIsGenerating(false)
-      toast({
-        title: "Lesson Generated!",
-        description: "Your micro-lesson has been created based on the uploaded files.",
+    try {
+      const file = selectedFiles[0]
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("owner_id", "user-123")
+      formData.append("explanation_level", appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior")
+      formData.append("framework", appliedFramework)
+
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/distill", {
+        method: "POST",
+        body: formData,
       })
-    }, 2000)
+
+      if (response.ok) {
+        const result = await response.json()
+        toast({
+          title: "Lesson Generated!",
+          description: "Your micro-lesson has been created based on the uploaded files.",
+        })
+        console.log("PDF processed:", result)
+      } else {
+        throw new Error("Failed to process PDF")
+      }
+    } catch (error) {
+      console.error("PDF processing failed:", error)
+      toast({
+        title: "Error",
+        description: "Failed to process PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }    }, 2000)
   }
 
   const handleApplySettings = () => {

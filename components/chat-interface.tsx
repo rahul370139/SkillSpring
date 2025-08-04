@@ -68,19 +68,14 @@ export function ChatInterface({ files, selectedLevel, selectedFramework }: ChatI
     setIsLoading(true)
 
     try {
-      const formData = new FormData()
-      formData.append("message", inputMessage)
-      formData.append("level", selectedLevel)
-      formData.append("framework", selectedFramework)
-
-      uploadedFiles.forEach((file) => {
-        formData.append("files", file)
-      })
-
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/chat", {
-        method: "POST",
-        body: formData,
-      })
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          user_id: "user-123",
+          explanation_level: selectedLevel === "beginner" ? "5_year_old" : selectedLevel === "intermediate" ? "intern" : "senior"
+        }),      })
 
       if (!response.ok) {
         throw new Error("Failed to send message")
