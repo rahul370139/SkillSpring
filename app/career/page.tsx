@@ -80,6 +80,11 @@ const assessmentQuestions = [
   },
   {
     id: 10,
+    question: "I enjoy learning new technologies and staying updated with industry trends",
+    type: "likert",
+  },
+  {
+    id: 10,
     question: "I prefer hands-on, practical work over theoretical concepts",
     type: "likert",
   },
