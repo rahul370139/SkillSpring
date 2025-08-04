@@ -77,7 +77,7 @@ export function ChatInterface({ files, selectedLevel, selectedFramework }: ChatI
         formData.append("files", file)
       })
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/chat", {
         method: "POST",
         body: formData,
       })

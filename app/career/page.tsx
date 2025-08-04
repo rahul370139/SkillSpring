@@ -133,7 +133,8 @@ const interestSuggestions = [
 ]
 
 const mockCareerResults = [
-  {
+  const [apiCareerResults, setApiCareerResults] = useState<any[]>([])
+  const [useApiResults, setUseApiResults] = useState(false)  {
     title: "Software Engineer",
     match: 92,
     description: "Design and develop software applications using various programming languages and frameworks.",
@@ -177,11 +178,48 @@ export default function CareerPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < assessmentQuestions.length - 1) {
       setCurrentStep((prev) => prev + 1)
     } else {
       setIsLoading(true)
+      try {
+        // Convert answers to array format expected by backend
+        const answersArray = Object.values(answers).map(answer => parseInt(answer))
+        
+        const response = await fetch("https://trainbackend-production.up.railway.app/api/career/match", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            answers: answersArray,
+            owner_id: "user-123", // Replace with actual user ID
+            user_profile: {
+              experience_level: "beginner",
+              interests: ["technology", "problem-solving"]
+            }
+          }),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          // Store the results for display
+          setApiCareerResults(result.results || [])
+          setUseApiResults(true)
+          setIsLoading(false)
+          setShowResults(true)
+        } else {
+          throw new Error("Career matching failed")
+        }
+      } catch (error) {
+        console.error("Career matching failed:", error)
+        setIsLoading(false)
+        // Show error toast or fallback to mock results
+        setShowResults(true)
+      }
+    }
+  }      setIsLoading(true)
       setTimeout(() => {
         setIsLoading(false)
         setShowResults(true)
@@ -306,7 +344,7 @@ export default function CareerPage() {
           </div>
 
           <div className="grid gap-6">
-            {mockCareerResults.map((career, index) => (
+            {useApiResults ? apiCareerResults : mockCareerResults).map((career, index) => (
               <Card key={index} className="group hover:shadow-lg transition-all duration-300 border-0 shadow-md">
                 <CardHeader>
                   <div className="flex items-start justify-between">
