@@ -60,11 +60,12 @@ export default function LearnPage() {
       const file = selectedFiles[0]
       const formData = new FormData()
       formData.append("file", file)
-      formData.append("owner_id", "user-123")
-      formData.append("explanation_level", appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior")
-      formData.append("framework", appliedFramework)
 
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/distill", {
+      const explanationLevel = appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior"
+      
+      const url = `https://trainbackend-production.up.railway.app/api/distill?owner_id=user-123&explanation_level=${explanationLevel}&framework=${appliedFramework}`
+
+      const response = await fetch(url, {
         method: "POST",
         body: formData,
       })
@@ -77,7 +78,9 @@ export default function LearnPage() {
         })
         console.log("PDF processed:", result)
       } else {
-        throw new Error("Failed to process PDF")
+        const errorText = await response.text()
+        console.error("API Error:", response.status, errorText)
+        throw new Error(`Failed to process PDF: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error("PDF processing failed:", error)
