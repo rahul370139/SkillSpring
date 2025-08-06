@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,25 +9,81 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Upload, FileText, Settings, Zap, Sparkles, Send, MessageSquare, Trash2, Download } from "lucide-react"
-import { ChatInterface } from "@/components/chat-interface"
+import { 
+  Upload, 
+  FileText, 
+  Settings, 
+  Zap, 
+  Sparkles, 
+  Send, 
+  MessageSquare, 
+  Trash2, 
+  Download,
+  Bot,
+  User,
+  Paperclip,
+  X,
+  Brain,
+  Target,
+  Palette
+} from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+
+interface Message {
+  id: string
+  content: string
+  sender: "user" | "ai"
+  timestamp: Date
+  files?: File[]
+  type?: "text" | "file" | "command"
+}
 
 export default function LearnPage() {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputMessage, setInputMessage] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [experienceLevel, setExperienceLevel] = useState("intermediate")
   const [framework, setFramework] = useState("general")
   const [appliedExperienceLevel, setAppliedExperienceLevel] = useState("intermediate")
   const [appliedFramework, setAppliedFramework] = useState("general")
   const [isDragOver, setIsDragOver] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]")
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }
 
   const handleFileUpload = (files: FileList | null) => {
     if (files) {
       const newFiles = Array.from(files).filter(
-        (file) => file.type === "application/pdf" || file.type === "text/plain" || file.name.endsWith(".md"),
+        (file) => file.type === "application/pdf" || file.type === "text/plain" || file.name.endsWith(".md")
       )
-      setSelectedFiles((prev) => [...prev, ...newFiles])
+      setUploadedFiles((prev) => [...prev, ...newFiles])
+      
+      // Add file upload message
+      const fileMessage: Message = {
+        id: Date.now().toString(),
+        content: `Uploaded ${newFiles.length} file(s): ${newFiles.map(f => f.name).join(", ")}`,
+        sender: "user",
+        timestamp: new Date(),
+        files: newFiles,
+        type: "file"
+      }
+      setMessages((prev) => [...prev, fileMessage])
+      
+      toast({
+        title: "Files Uploaded",
+        description: `${newFiles.length} file(s) uploaded successfully. You can now ask questions about them.`,
+      })
     }
   }
 
@@ -48,49 +103,69 @@ export default function LearnPage() {
     handleFileUpload(e.dataTransfer.files)
   }
 
-  const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  const removeUploadedFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleGenerateLesson = async () => {
-    if (selectedFiles.length === 0) return
-    
-    setIsGenerating(true)
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() && uploadedFiles.length === 0) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: inputMessage,
+      sender: "user",
+      timestamp: new Date(),
+      type: "text"
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setInputMessage("")
+    setIsLoading(true)
+
     try {
-      const file = selectedFiles[0]
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const explanationLevel = appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior"
-      
-      const url = `https://trainbackend-production.up.railway.app/api/distill?owner_id=user-123&explanation_level=${explanationLevel}&framework=${appliedFramework}`
-
-      const response = await fetch(url, {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/chat", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          user_id: "user-123",
+          explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior",
+          framework: appliedFramework
+        }),
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        toast({
-          title: "Lesson Generated!",
-          description: "Your micro-lesson has been created based on the uploaded files.",
-        })
-        console.log("PDF processed:", result)
-      } else {
-        const errorText = await response.text()
-        console.error("API Error:", response.status, errorText)
-        throw new Error(`Failed to process PDF: ${response.status} - ${errorText}`)
+      if (!response.ok) {
+        throw new Error("Failed to send message")
       }
+
+      const data = await response.json()
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || "I'm here to help you learn! Ask me anything about your uploaded materials.",
+        sender: "ai",
+        timestamp: new Date(),
+      }
+
+      setMessages((prev) => [...prev, aiMessage])
     } catch (error) {
-      console.error("PDF processing failed:", error)
+      console.error("Error sending message:", error)
       toast({
         title: "Error",
-        description: "Failed to process PDF. Please try again.",
+        description: "Failed to send message. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsGenerating(false)
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
     }
   }
 
@@ -111,6 +186,8 @@ export default function LearnPage() {
   }
 
   const handleClearChat = () => {
+    setMessages([])
+    setUploadedFiles([])
     toast({
       title: "Chat cleared",
       description: "All messages have been removed",
@@ -130,99 +207,6 @@ export default function LearnPage() {
           </p>
         </div>
 
-        {/* File Upload Section - Made Shorter */}
-        <Card className="border shadow-lg bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/10 dark:to-purple-950/10 dark:bg-card">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Upload className="h-5 w-5" />
-                Upload Learning Materials
-              </CardTitle>
-              <Button
-                onClick={handleGenerateLesson}
-                disabled={selectedFiles.length === 0 || isGenerating}
-                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-md"
-              >
-                {isGenerating ? (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Generate Lesson
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 bg-background/50 ${
-                isDragOver
-                  ? "border-primary bg-primary/5 scale-105"
-                  : "border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/30"
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <div className="space-y-3">
-                <div className="w-12 h-12 mx-auto bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                  <Upload className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium">Drop your files here</p>
-                  <p className="text-sm text-muted-foreground">or click to browse</p>
-                </div>
-                <Input
-                  type="file"
-                  multiple
-                  accept=".pdf,.txt,.md"
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Label htmlFor="file-upload">
-                  <Button variant="outline" className="cursor-pointer bg-transparent" asChild>
-                    <span>Choose Files</span>
-                  </Button>
-                </Label>
-                <p className="text-xs text-muted-foreground">Supports PDF, TXT, and Markdown files</p>
-              </div>
-            </div>
-
-            {/* Selected Files */}
-            {selectedFiles.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Selected Files:</Label>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {selectedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-background rounded-lg border">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium truncate">{file.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Chat Area */}
           <div className="lg:col-span-3">
@@ -234,11 +218,182 @@ export default function LearnPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 h-full">
-                <ChatInterface
-                  files={selectedFiles}
-                  selectedLevel={appliedExperienceLevel}
-                  selectedFramework={appliedFramework}
-                />
+                <div className="flex flex-col h-full">
+                  {/* Messages Area */}
+                  <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+                    <div className="space-y-4">
+                      {messages.length === 0 && (
+                        <div className="text-center py-8">
+                          <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground mb-4">
+                            Hello! I'm your AI learning assistant. Upload some files and ask me questions to get started.
+                          </p>
+                          
+                          {/* Upload Area */}
+                          <div
+                            className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 bg-background/50 max-w-md mx-auto ${
+                              isDragOver
+                                ? "border-primary bg-primary/5 scale-105"
+                                : "border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/30"
+                            }`}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                          >
+                            <div className="space-y-3">
+                              <div className="w-12 h-12 mx-auto bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                <Upload className="h-6 w-6 text-white" />
+                              </div>
+                              <div>
+                                <p className="font-medium">Drop your files here</p>
+                                <p className="text-sm text-muted-foreground">or click to browse</p>
+                              </div>
+                              <Input
+                                type="file"
+                                multiple
+                                accept=".pdf,.txt,.md"
+                                onChange={(e) => handleFileUpload(e.target.files)}
+                                className="hidden"
+                                id="file-upload"
+                              />
+                              <Label htmlFor="file-upload">
+                                <Button variant="outline" className="cursor-pointer bg-transparent" asChild>
+                                  <span>Choose Files</span>
+                                </Button>
+                              </Label>
+                              <p className="text-xs text-muted-foreground">Supports PDF, TXT, and Markdown files</p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                            <Badge variant="outline">Level: {appliedExperienceLevel}</Badge>
+                            <Badge variant="outline">Focus: {appliedFramework}</Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {messages.map((message) => (
+                        <div key={message.id} className={`flex gap-3 ${message.sender === "user" ? "justify-end" : ""}`}>
+                          {message.sender === "ai" && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-blue-100 text-blue-600">
+                                <Bot className="h-4 w-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+
+                          <div
+                            className={`max-w-[80%] rounded-lg p-3 ${
+                              message.sender === "user"
+                                ? "bg-primary text-primary-foreground ml-auto"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+
+                            {message.files && message.files.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {message.files.map((file, index) => (
+                                  <div key={index} className="flex items-center gap-2 text-xs opacity-75">
+                                    <Paperclip className="h-3 w-3" />
+                                    <span>{file.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="text-xs opacity-50 mt-1">
+                              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                          </div>
+
+                          {message.sender === "user" && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-green-100 text-green-600">
+                                <User className="h-4 w-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      ))}
+
+                      {isLoading && (
+                        <div className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-blue-100 text-blue-600">
+                              <Bot className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="bg-muted rounded-lg p-3">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  {/* File Upload Area */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="border-t p-3 bg-muted/30">
+                      <div className="flex flex-wrap gap-2">
+                        {uploadedFiles.map((file, index) => (
+                          <div key={index} className="flex items-center gap-2 bg-background rounded px-2 py-1 text-sm">
+                            <Paperclip className="h-3 w-3" />
+                            <span className="truncate max-w-32">{file.name}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeUploadedFile(index)}
+                              className="h-4 w-4 p-0 hover:bg-red-100"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Input Area */}
+                  <div className="border-t p-4">
+                    <div className="flex gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept=".pdf,.txt,.md"
+                        onChange={(e) => handleFileUpload(e.target.files)}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => fileInputRef.current?.click()} 
+                        className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Ask me anything about your learning materials..."
+                        className="flex-1"
+                        disabled={isLoading}
+                      />
+                      <Button
+                        onClick={handleSendMessage}
+                        disabled={isLoading || (!inputMessage.trim() && uploadedFiles.length === 0)}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -284,12 +439,21 @@ export default function LearnPage() {
                   <Label htmlFor="framework" className="text-sm font-medium">
                     Framework/Tool Focus
                   </Label>
-                  <Input
-                    id="framework"
-                    value={framework}
-                    onChange={(e) => setFramework(e.target.value)}
-                    placeholder="e.g., React, Node.js, Python"
-                  />
+                  <Select value={framework} onValueChange={setFramework}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select framework" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="react">React</SelectItem>
+                      <SelectItem value="python">Python</SelectItem>
+                      <SelectItem value="nodejs">Node.js</SelectItem>
+                      <SelectItem value="docker">Docker</SelectItem>
+                      <SelectItem value="fastapi">FastAPI</SelectItem>
+                      <SelectItem value="machine-learning">Machine Learning</SelectItem>
+                      <SelectItem value="data-science">Data Science</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Separator />
@@ -314,14 +478,14 @@ export default function LearnPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Files:</span>
-                      <Badge variant="default">{selectedFiles.length}</Badge>
+                      <Badge variant="default">{uploadedFiles.length}</Badge>
                     </div>
                   </div>
                 </div>
 
                 <Separator />
 
-                {/* Chat Controls - Properly Fitted */}
+                {/* Chat Controls */}
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Chat Controls</h4>
                   <div className="grid grid-cols-2 gap-2">
