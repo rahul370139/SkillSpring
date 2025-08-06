@@ -98,7 +98,7 @@ export default function CareerDiscoverPage() {
       // Submit and get results
       setIsLoading(true)
       try {
-        const response = await fetch("https://trainbackend-production.up.railway.app/api/career-pathfinder", {
+        const response = await fetch("https://trainbackend-production.up.railway.app/api/career/match", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
