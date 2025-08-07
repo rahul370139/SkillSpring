@@ -51,18 +51,45 @@ async function uploadToDistill(file: File, ownerId: string) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json() as Promise<{ lesson_id: number; actions: string[] }>;
+  console.log("Uploading to:", `${API}/api/distill?owner_id=${ownerId}`)
+  console.log("File:", file.name, "Size:", file.size, "Type:", file.type)
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+  try {
+    const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    console.log("Response status:", r.status)
+    
+    if (!r.ok) {
+      const errorText = await r.text()
+      console.error("Upload error:", errorText)
+      throw new Error(`${r.status}: ${errorText}`)
+    }
+    
+    const result = await r.json()
+    console.log("Upload success:", result)
+    return result as Promise<{ lesson_id: number; actions: string[] }>;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error("Upload timeout. Please try again.")
+    }
+    throw error;
+  }
 }
 
 export default function LearnPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [experienceLevel, setExperienceLevel] = useState("intermediate")
   const [framework, setFramework] = useState("general")
@@ -102,10 +129,15 @@ export default function LearnPage() {
       return
     }
 
+    setIsUploading(true)
+    
     try {
-      setIsLoading(true)
+      console.log("Starting file upload:", supportedFiles[0].name)
+      
       // NOTE: one-file upload for MVP
       const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "user-123")
+      
+      console.log("Upload successful, response:", distillResp)
 
       // ① Store file locally
       setUploadedFiles(prev => [...prev, supportedFiles[0]])
@@ -137,6 +169,10 @@ export default function LearnPage() {
           errorMessage = "The PDF could not be processed. Please ensure it contains readable text and try again."
         } else if (err.message.includes("PDF only")) {
           errorMessage = "Please upload a valid PDF file."
+        } else if (err.message.includes("422")) {
+          errorMessage = "Invalid file format. Please upload a valid PDF file."
+        } else if (err.message.includes("500")) {
+          errorMessage = "Server error. Please try again later."
         } else {
           errorMessage = err.message
         }
@@ -147,7 +183,7 @@ export default function LearnPage() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setIsUploading(false)
     }
   }
   const handleDragOver = (e: React.DragEvent) => {
@@ -367,7 +403,7 @@ export default function LearnPage() {
                                   variant="outline" 
                                   className="cursor-pointer bg-transparent" 
                                   asChild
-                                  disabled={isLoading}
+                                  disabled={isUploading}
                                 >
                                   <span>Choose Files</span>
                                 </Button>
@@ -444,7 +480,7 @@ export default function LearnPage() {
                         </div>
                       ))}
 
-                      {isLoading && (
+                      {(isLoading || isUploading) && (
                         <div className="flex gap-3">
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className="bg-blue-100 text-blue-600">
@@ -452,10 +488,15 @@ export default function LearnPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div className="bg-muted rounded-lg p-3">
-                            <div className="flex space-x-1">
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                            <div className="flex items-center gap-2">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                              </div>
+                              <span className="text-sm text-muted-foreground">
+                                {isUploading ? "Uploading file..." : "AI is thinking..."}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -493,7 +534,7 @@ export default function LearnPage() {
                         size="icon" 
                         onClick={() => fileInputRef.current?.click()} 
                         className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
-                        disabled={isLoading}
+                        disabled={isUploading}
                       >
                         <Upload className="h-4 w-4" />
                       </Button>
