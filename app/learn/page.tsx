@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,7 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/components/auth-provider"
 
 interface Message {
   id: string
@@ -37,18 +38,20 @@ interface Message {
   sender: "user" | "ai"
   timestamp: Date
   files?: File[]
-  type?: "text" | "file" | "command"
+  type?: "text" | "file" | "actions"
+  // NEW fields for messages of type="actions":
+  lesson_id?: number
+  actions?: string[]
 }
 
-const API = "https://trainbackend-production.up.railway.app";
+const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
 
 /** POST /api/distill  – returns { lesson_id, actions[] } */
-async function uploadToDistill(file: File) {
+async function uploadToDistill(file: File, ownerId: string) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("owner_id", "user-123"); // TODO: use supabase user id
 
-  const r = await fetch(`${API}/api/distill`, {
+  const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
     method: "POST",
     body: formData,
   });
@@ -67,9 +70,12 @@ export default function LearnPage() {
   const [appliedFramework, setAppliedFramework] = useState("general")
   const [isDragOver, setIsDragOver] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const [currentLesson, setCurrentLesson] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [distillResponse, setDistillResponse] = useState<{ lesson_id: number; actions: string[] } | null>(null)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -82,11 +88,15 @@ export default function LearnPage() {
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return
-    const pdfs = Array.from(files).filter(f => f.type === "application/pdf")
-    if (!pdfs.length) {
+    const supportedFiles = Array.from(files).filter(f => 
+      f.type === "application/pdf" || 
+      f.type === "text/plain" || 
+      f.type === "text/markdown"
+    )
+    if (!supportedFiles.length) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload PDF files only.",
+        description: "Please upload PDF, TXT, or Markdown files only.",
         variant: "destructive",
       })
       return
@@ -95,37 +105,45 @@ export default function LearnPage() {
     try {
       setIsLoading(true)
       // NOTE: one-file upload for MVP
-      const distillResp = await uploadToDistill(pdfs[0])
+      const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "user-123")
 
       // ① Store file locally
-      setUploadedFiles(prev => [...prev, pdfs[0]])
+      setUploadedFiles(prev => [...prev, supportedFiles[0]])
 
       // ② Push a "system" message with action buttons
       setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
-          content: `✅ ${pdfs[0].name} uploaded and processed. What would you like to do?`,
+          content: `✅ ${supportedFiles[0].name} uploaded and processed. What would you like to do?`,
           sender: "ai",
           timestamp: new Date(),
-          type: "actions", // NEW
+          type: "actions",
           files: [],
-        },
+          lesson_id: distillResp.lesson_id,
+          actions: distillResp.actions,
+        } as Message & { lesson_id: number; actions: string[] }
       ])
-
-      // ③ Save distill meta in state so we can request summary/quiz later
-      setCurrentLesson(distillResp.lesson_id) // new state variable
-      setDistillResponse(distillResp) // new state variable
       
       toast({
         title: "File Processed Successfully",
-        description: `${pdfs[0].name} uploaded and processed. You can now generate summaries, quizzes, and more!`,
+        description: `${supportedFiles[0].name} uploaded and processed. You can now generate summaries, quizzes, and more!`,
       })
     } catch (err) {
       console.error("Upload failed:", err)
+      let errorMessage = "Upload failed. Please try again."
+      if (err instanceof Error) {
+        if (err.message.includes("Failed to process PDF")) {
+          errorMessage = "The PDF could not be processed. Please ensure it contains readable text and try again."
+        } else if (err.message.includes("PDF only")) {
+          errorMessage = "Please upload a valid PDF file."
+        } else {
+          errorMessage = err.message
+        }
+      }
       toast({
         title: "Upload failed",
-        description: String(err),
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -153,31 +171,41 @@ export default function LearnPage() {
   }
 
   // Implement handleActionClick
-  const handleActionClick = async (action: string) => {
-    if (!currentLesson) return
+  const handleActionClick = async (action: string, lessonId: number) => {
     setIsLoading(true)
     
     try {
       const res = await fetch(
-        `${API}/api/lesson/${currentLesson}/${action}`,
+        `${API}/api/lesson/${lessonId}/${action}`,
         { method: "GET" }
       )
-      const data = await res.json() // {content: "..."} or structured JSON
+      if (!res.ok) throw new Error(await res.text())
+      const { content } = await res.json()
       
       setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
-          content: data.content || `Generated ${action} for your document.`,
+          content: content || `Generated ${action} for your document.`,
           sender: "ai",
           timestamp: new Date(),
         },
       ])
     } catch (error) {
       console.error(`Failed to generate ${action}:`, error)
+      let errorMessage = `Failed to generate ${action}. Please try again.`
+      if (error instanceof Error) {
+        if (error.message.includes("404")) {
+          errorMessage = `The ${action} feature is not available for this document.`
+        } else if (error.message.includes("500")) {
+          errorMessage = `Server error while generating ${action}. Please try again later.`
+        } else {
+          errorMessage = error.message
+        }
+      }
       toast({
         title: "Generation Failed",
-        description: `Failed to generate ${action}. Please try again.`,
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -200,15 +228,15 @@ export default function LearnPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/chat", {
+      const response = await fetch(`${API}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message: inputMessage,
-          user_id: "user-123",
-          explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior",
+          user_id: user?.id || "user-123",
+          explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
           framework: appliedFramework
         }),
       })
@@ -326,6 +354,7 @@ export default function LearnPage() {
                                 <p className="text-sm text-muted-foreground">or click to browse</p>
                               </div>
                               <Input
+                                ref={fileInputRef}
                                 type="file"
                                 multiple
                                 accept=".pdf,.txt,.md"
@@ -334,7 +363,12 @@ export default function LearnPage() {
                                 id="file-upload"
                               />
                               <Label htmlFor="file-upload">
-                                <Button variant="outline" className="cursor-pointer bg-transparent" asChild>
+                                <Button 
+                                  variant="outline" 
+                                  className="cursor-pointer bg-transparent" 
+                                  asChild
+                                  disabled={isLoading}
+                                >
                                   <span>Choose Files</span>
                                 </Button>
                               </Label>
@@ -381,14 +415,14 @@ export default function LearnPage() {
 
                             <div className="text-xs opacity-50 mt-1">
                             {/* Render option buttons when type==="actions" */}
-                            {message.type === "actions" && distillResponse?.actions && (
+                            {message.type === "actions" && message.actions && (
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {distillResponse.actions.map((action) => (
+                                {message.actions.map((action) => (
                                   <Button
                                     key={action}
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => handleActionClick(action)}
+                                    onClick={() => handleActionClick(action, message.lesson_id!)}
                                     disabled={isLoading}
                                   >
                                     {action.charAt(0).toUpperCase() + action.slice(1)}
@@ -454,19 +488,12 @@ export default function LearnPage() {
                   {/* Input Area */}
                   <div className="border-t p-4">
                     <div className="flex gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept=".pdf,.txt,.md"
-                        onChange={(e) => handleFileUpload(e.target.files)}
-                        className="hidden"
-                      />
                       <Button 
                         variant="outline" 
                         size="icon" 
                         onClick={() => fileInputRef.current?.click()} 
                         className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                        disabled={isLoading}
                       >
                         <Upload className="h-4 w-4" />
                       </Button>
