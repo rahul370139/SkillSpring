@@ -62,7 +62,7 @@ export default function LearnPage() {
     }
   }
 
-  const handleFileUpload = (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | null) => {
     if (files) {
       const newFiles = Array.from(files).filter(
         (file) => file.type === "application/pdf" || file.type === "text/plain" || file.name.endsWith(".md")
