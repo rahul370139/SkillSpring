@@ -40,6 +40,22 @@ interface Message {
   type?: "text" | "file" | "command"
 }
 
+const API = "https://trainbackend-production.up.railway.app";
+
+/** POST /api/distill  – returns { lesson_id, actions[] } */
+async function uploadToDistill(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("owner_id", "user-123"); // TODO: use supabase user id
+
+  const r = await fetch(`${API}/api/distill`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ lesson_id: number; actions: string[] }>;
+}
+
 export default function LearnPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
@@ -53,6 +69,7 @@ export default function LearnPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [currentLesson, setCurrentLesson] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [distillResponse, setDistillResponse] = useState<{ lesson_id: number; actions: string[] } | null>(null)
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -84,7 +101,7 @@ export default function LearnPage() {
       setUploadedFiles(prev => [...prev, pdfs[0]])
 
       // ② Push a "system" message with action buttons
-      setMessages(prev => [
+      setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
@@ -98,6 +115,7 @@ export default function LearnPage() {
 
       // ③ Save distill meta in state so we can request summary/quiz later
       setCurrentLesson(distillResp.lesson_id) // new state variable
+      setDistillResponse(distillResp) // new state variable
       
       toast({
         title: "File Processed Successfully",
@@ -141,12 +159,12 @@ export default function LearnPage() {
     
     try {
       const res = await fetch(
-        `https://trainbackend-production.up.railway.app/api/lesson/${currentLesson}/${action}`,
+        `${API}/api/lesson/${currentLesson}/${action}`,
         { method: "GET" }
       )
       const data = await res.json() // {content: "..."} or structured JSON
       
-      setMessages(prev => [
+      setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
@@ -177,7 +195,7 @@ export default function LearnPage() {
       type: "text"
     }
 
-    setMessages((prev) => [...prev, userMessage])
+          setMessages((prev: Message[]) => [...prev, userMessage])
     setInputMessage("")
     setIsLoading(true)
 
@@ -208,7 +226,7 @@ export default function LearnPage() {
         timestamp: new Date(),
       }
 
-      setMessages((prev) => [...prev, aiMessage])
+      setMessages((prev: Message[]) => [...prev, aiMessage])
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
@@ -363,17 +381,17 @@ export default function LearnPage() {
 
                             <div className="text-xs opacity-50 mt-1">
                             {/* Render option buttons when type==="actions" */}
-                            {message.type === "actions" && (
+                            {message.type === "actions" && distillResponse?.actions && (
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {["Summary", "Lesson", "Quiz", "Flashcards", "Workflow"].map((label) => (
+                                {distillResponse.actions.map((action) => (
                                   <Button
-                                    key={label}
+                                    key={action}
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => handleActionClick(label.toLowerCase())}
+                                    onClick={() => handleActionClick(action)}
                                     disabled={isLoading}
                                   >
-                                    {label}
+                                    {action.charAt(0).toUpperCase() + action.slice(1)}
                                   </Button>
                                 ))}
                               </div>
