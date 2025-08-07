@@ -51,6 +51,7 @@ export default function LearnPage() {
   const [appliedFramework, setAppliedFramework] = useState("general")
   const [isDragOver, setIsDragOver] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const [currentLesson, setCurrentLesson] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
@@ -63,30 +64,56 @@ export default function LearnPage() {
   }
 
   const handleFileUpload = async (files: FileList | null) => {
-    if (files) {
-      const newFiles = Array.from(files).filter(
-        (file) => file.type === "application/pdf" || file.type === "text/plain" || file.name.endsWith(".md")
-      )
-      setUploadedFiles((prev) => [...prev, ...newFiles])
-      
-      // Add file upload message
-      const fileMessage: Message = {
-        id: Date.now().toString(),
-        content: `Uploaded ${newFiles.length} file(s): ${newFiles.map(f => f.name).join(", ")}`,
-        sender: "user",
-        timestamp: new Date(),
-        files: newFiles,
-        type: "file"
-      }
-      setMessages((prev) => [...prev, fileMessage])
+    if (!files?.length) return
+    const pdfs = Array.from(files).filter(f => f.type === "application/pdf")
+    if (!pdfs.length) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload PDF files only.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      // NOTE: one-file upload for MVP
+      const distillResp = await uploadToDistill(pdfs[0])
+
+      // ① Store file locally
+      setUploadedFiles(prev => [...prev, pdfs[0]])
+
+      // ② Push a "system" message with action buttons
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: `✅ ${pdfs[0].name} uploaded and processed. What would you like to do?`,
+          sender: "ai",
+          timestamp: new Date(),
+          type: "actions", // NEW
+          files: [],
+        },
+      ])
+
+      // ③ Save distill meta in state so we can request summary/quiz later
+      setCurrentLesson(distillResp.lesson_id) // new state variable
       
       toast({
-        title: "Files Uploaded",
-        description: `${newFiles.length} file(s) uploaded successfully. You can now ask questions about them.`,
+        title: "File Processed Successfully",
+        description: `${pdfs[0].name} uploaded and processed. You can now generate summaries, quizzes, and more!`,
       })
+    } catch (err) {
+      console.error("Upload failed:", err)
+      toast({
+        title: "Upload failed",
+        description: String(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(true)
@@ -107,6 +134,38 @@ export default function LearnPage() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // Implement handleActionClick
+  const handleActionClick = async (action: string) => {
+    if (!currentLesson) return
+    setIsLoading(true)
+    
+    try {
+      const res = await fetch(
+        `https://trainbackend-production.up.railway.app/api/lesson/${currentLesson}/${action}`,
+        { method: "GET" }
+      )
+      const data = await res.json() // {content: "..."} or structured JSON
+      
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: data.content || `Generated ${action} for your document.`,
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ])
+    } catch (error) {
+      console.error(`Failed to generate ${action}:`, error)
+      toast({
+        title: "Generation Failed",
+        description: `Failed to generate ${action}. Please try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
   const handleSendMessage = async () => {
     if (!inputMessage.trim() && uploadedFiles.length === 0) return
 
@@ -303,6 +362,22 @@ export default function LearnPage() {
                             )}
 
                             <div className="text-xs opacity-50 mt-1">
+                            {/* Render option buttons when type==="actions" */}
+                            {message.type === "actions" && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {["Summary", "Lesson", "Quiz", "Flashcards", "Workflow"].map((label) => (
+                                  <Button
+                                    key={label}
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleActionClick(label.toLowerCase())}
+                                    disabled={isLoading}
+                                  >
+                                    {label}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
                               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </div>
                           </div>
