@@ -33,6 +33,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/components/auth-provider"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { LessonDisplay } from "@/components/lesson-display"
 
 interface Message {
   id: string
@@ -40,10 +41,20 @@ interface Message {
   sender: "user" | "ai"
   timestamp: Date
   files?: File[]
-  type?: "text" | "file" | "actions"
+  type?: "text" | "file" | "actions" | "lesson"
   // NEW fields for messages of type="actions":
   lesson_id?: number
   actions?: string[]
+  // NEW fields for messages of type="lesson":
+  lessonData?: {
+    lesson_id: string
+    bullets: string[]
+    flashcards: Array<{ front: string; back: string }>
+    quiz: Array<{ question: string; options: string[]; answer: string }>
+    concept_map: any
+    framework: string
+    explanation_level: string
+  }
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
@@ -343,40 +354,92 @@ export default function LearnPage() {
       
       console.log("Final content to display:", content)
       
-      // Add the generated content to chat
-      setMessages((prev: Message[]) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          content: content,
-          sender: "ai",
-          timestamp: new Date(),
-        },
-      ])
-      
-      // Also send the generated content to the chat API so the AI can reference it
-      if (conversationId) {
-        try {
-          const chatResponse = await fetch(`${API}/api/chat`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              message: `Here is the ${action} I generated: ${content}`,
-              user_id: user?.id || "anonymous-user",
-              conversation_id: conversationId,
-              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+      // Handle different action types with proper rendering
+      if (action === "lesson") {
+        // Use LessonDisplay component for complete lesson
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "lesson",
+            lessonData: {
+              lesson_id: lessonId.toString(),
+              bullets: data.content.bullets || [],
+              flashcards: data.content.flashcards || [],
+              quiz: data.content.quiz || [],
+              concept_map: data.content.concept_map || {},
               framework: appliedFramework,
-              lesson_id: lessonId,
-            }),
-          })
-          
-          if (chatResponse.ok) {
-            console.log("Generated content sent to chat context successfully")
+              explanation_level: appliedExperienceLevel,
+            }
           }
-        } catch (error) {
-          console.error("Failed to send generated content to chat:", error)
+        ])
+      } else if (action === "summary") {
+        // Use Markdown for bullets
+        const bullets = Array.isArray(data.content) ? data.content : []
+        const md = bullets.map((pt: string) => `- **${pt}**`).join("\n")
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            content: md,
+          }
+        ])
+        
+        // Send to chat context
+        if (conversationId) {
+          try {
+            await fetch(`${API}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `Here is the summary: ${bullets.join("; ")}`,
+                user_id: user?.id || "anonymous-user",
+                conversation_id: conversationId,
+                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+                framework: appliedFramework,
+                lesson_id: lessonId,
+              })
+            })
+            console.log("Summary sent to chat context")
+          } catch (error) {
+            console.error("Failed to send summary to chat:", error)
+          }
+        }
+      } else {
+        // Default handling for other actions (flashcards, quiz, workflow)
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            content: content,
+            sender: "ai",
+            timestamp: new Date(),
+          }
+        ])
+        
+        // Send to chat context
+        if (conversationId) {
+          try {
+            await fetch(`${API}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `Here is the ${action} I generated: ${content}`,
+                user_id: user?.id || "anonymous-user",
+                conversation_id: conversationId,
+                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+                framework: appliedFramework,
+                lesson_id: lessonId,
+              })
+            })
+            console.log(`${action} sent to chat context`)
+          } catch (error) {
+            console.error(`Failed to send ${action} to chat:`, error)
+          }
         }
       }
       
@@ -613,11 +676,17 @@ export default function LearnPage() {
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            <div className="text-sm prose dark:prose-invert max-w-none">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {message.content}
-                              </ReactMarkdown>
-                            </div>
+                            {message.type === "lesson" && message.lessonData ? (
+                              <div className="mt-3">
+                                <LessonDisplay lesson={message.lessonData} />
+                              </div>
+                            ) : (
+                              <div className="text-sm prose dark:prose-invert max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
+                            )}
 
                             {message.files && message.files.length > 0 && (
                               <div className="mt-2 space-y-1">
