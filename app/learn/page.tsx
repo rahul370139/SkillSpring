@@ -109,17 +109,18 @@ async function uploadFileForChat(file: File, userId: string, conversationId: str
   
   const form = new FormData()
   form.append("file", file)
-  form.append("user_id", userId)
   if (conversationId) form.append("conversation_id", conversationId)
   form.append("explanation_level", explanationLevel)
 
-  console.log("Uploading to chat:", `${API}/api/chat/upload`)
+  // Build URL with user_id as query parameter
+  const url = `${API}/api/chat/upload?user_id=${encodeURIComponent(userId)}`
+  console.log("Uploading to chat:", url)
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 120000)
 
   try {
-    const res = await fetch(`${API}/api/chat/upload`, {
+    const res = await fetch(url, {
       method: "POST",
       body: form,
       signal: controller.signal,
