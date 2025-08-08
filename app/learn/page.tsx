@@ -50,6 +50,8 @@ const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.
 
 /** POST /api/distill  – returns { lesson_id, actions[] } */
 async function uploadToDistill(file: File, ownerId: string) {
+  console.log("uploadToDistill called with:", { fileName: file.name, fileSize: file.size, fileType: file.type, ownerId })
+  
   const formData = new FormData();
   formData.append("file", file);
 
@@ -60,6 +62,7 @@ async function uploadToDistill(file: File, ownerId: string) {
   const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for Railway cold-start
 
   try {
+    console.log("Making fetch request...")
     const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
       method: "POST",
       body: formData,
@@ -68,6 +71,7 @@ async function uploadToDistill(file: File, ownerId: string) {
     
     clearTimeout(timeoutId);
     console.log("Response status:", r.status)
+    console.log("Response headers:", Object.fromEntries(r.headers.entries()))
     
     if (!r.ok) {
       const errorText = await r.text()
@@ -80,6 +84,7 @@ async function uploadToDistill(file: File, ownerId: string) {
     return result as { lesson_id: number; actions: string[] };
   } catch (error) {
     clearTimeout(timeoutId);
+    console.error("Upload failed with error:", error)
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error("Upload timeout. Please try again.")
     }
@@ -117,9 +122,19 @@ export default function LearnPage() {
   }
 
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files?.length) return
+    console.log("handleFileUpload called with:", files)
+    if (!files?.length) {
+      console.log("No files provided")
+      return
+    }
+    
+    console.log("All files:", Array.from(files).map(f => ({ name: f.name, type: f.type, size: f.size })))
+    
     const supportedFiles = Array.from(files).filter(f => f.type === "application/pdf")
+    console.log("Supported PDF files:", supportedFiles.map(f => f.name))
+    
     if (!supportedFiles.length) {
+      console.log("No PDF files found")
       toast({
         title: "Invalid File Type",
         description: "Please upload PDF files only.",
@@ -134,6 +149,11 @@ export default function LearnPage() {
       console.log("Starting file upload:", supportedFiles[0].name)
       console.log("API URL:", API)
       console.log("User ID:", user?.id || "anonymous-user")
+      console.log("File details:", {
+        name: supportedFiles[0].name,
+        type: supportedFiles[0].type,
+        size: supportedFiles[0].size
+      })
       
       // NOTE: one-file upload for MVP
       const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "anonymous-user")
