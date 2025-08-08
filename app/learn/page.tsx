@@ -255,12 +255,28 @@ export default function LearnPage() {
       if (typeof data === 'string') {
         content = data
       } else if (data.content) {
-        content = data.content
+        // Handle nested content structure
+        if (typeof data.content === 'string') {
+          content = data.content
+        } else if (Array.isArray(data.content)) {
+          // Handle array content (like summary bullets)
+          content = data.content.join('\n\n')
+        } else if (data.content.cards) {
+          // Handle flashcards format
+          content = data.content.cards.map((card: any, index: number) => 
+            `**Card ${index + 1}:**\n${card.question || card.front || 'Question'}\n\n**Answer:** ${card.answer || card.back || 'Answer'}`
+          ).join('\n\n')
+        } else if (data.content.workflow) {
+          // Handle workflow format
+          content = data.content.workflow.join('\n\n')
+        } else if (data.content.title && data.content.summary) {
+          // Handle lesson format
+          content = `# ${data.content.title}\n\n${data.content.summary}\n\n## Key Points:\n${data.content.bullets?.join('\n') || ''}`
+        } else {
+          content = JSON.stringify(data.content, null, 2)
+        }
       } else if (data.response) {
         content = data.response
-      } else if (data.cards) {
-        // Handle flashcards format
-        content = JSON.stringify(data.cards, null, 2)
       } else {
         content = `Generated ${action} for your document.`
       }
