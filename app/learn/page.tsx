@@ -31,6 +31,8 @@ import { toast } from "@/components/ui/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/components/auth-provider"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 interface Message {
   id: string
@@ -44,7 +46,7 @@ interface Message {
   actions?: string[]
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 /** POST /api/distill  – returns { lesson_id, actions[] } */
 async function uploadToDistill(file: File, ownerId: string) {
@@ -55,7 +57,7 @@ async function uploadToDistill(file: File, ownerId: string) {
   console.log("File:", file.name, "Size:", file.size, "Type:", file.type)
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for Railway cold-start
 
   try {
     const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
@@ -115,15 +117,11 @@ export default function LearnPage() {
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return
-    const supportedFiles = Array.from(files).filter(f => 
-      f.type === "application/pdf" || 
-      f.type === "text/plain" || 
-      f.type === "text/markdown"
-    )
+    const supportedFiles = Array.from(files).filter(f => f.type === "application/pdf")
     if (!supportedFiles.length) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload PDF, TXT, or Markdown files only.",
+        description: "Please upload PDF files only.",
         variant: "destructive",
       })
       return
@@ -135,7 +133,7 @@ export default function LearnPage() {
       console.log("Starting file upload:", supportedFiles[0].name)
       
       // NOTE: one-file upload for MVP
-      const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "user-123")
+      const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "anonymous-user")
       
       console.log("Upload successful, response:", distillResp)
 
@@ -153,7 +151,7 @@ export default function LearnPage() {
           type: "actions",
           files: [],
           lesson_id: distillResp.lesson_id,
-          actions: distillResp.actions,
+          actions: distillResp.actions || ["summary", "lesson", "quiz", "flashcards", "workflow"],
         } as Message & { lesson_id: number; actions: string[] }
       ])
       
@@ -271,7 +269,7 @@ export default function LearnPage() {
         },
         body: JSON.stringify({
           message: inputMessage,
-          user_id: user?.id || "user-123",
+          user_id: user?.id || "anonymous-user",
           explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
           framework: appliedFramework
         }),
@@ -393,7 +391,7 @@ export default function LearnPage() {
                                 ref={fileInputRef}
                                 type="file"
                                 multiple
-                                accept=".pdf,.txt,.md"
+                                accept=".pdf"
                                 onChange={(e) => handleFileUpload(e.target.files)}
                                 className="hidden"
                                 id="file-upload"
@@ -408,7 +406,7 @@ export default function LearnPage() {
                                   <span>Choose Files</span>
                                 </Button>
                               </Label>
-                              <p className="text-xs text-muted-foreground">Supports PDF, TXT, and Markdown files</p>
+                              <p className="text-xs text-muted-foreground">Supports PDF files only</p>
                             </div>
                           </div>
                           
@@ -436,7 +434,11 @@ export default function LearnPage() {
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                            <div className="text-sm prose dark:prose-invert max-w-none">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
 
                             {message.files && message.files.length > 0 && (
                               <div className="mt-2 space-y-1">
@@ -459,7 +461,7 @@ export default function LearnPage() {
                                     size="sm"
                                     variant="secondary"
                                     onClick={() => handleActionClick(action, message.lesson_id!)}
-                                    disabled={isLoading}
+                                    disabled={isLoading || isUploading}
                                   >
                                     {action.charAt(0).toUpperCase() + action.slice(1)}
                                   </Button>
