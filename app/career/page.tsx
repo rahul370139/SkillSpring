@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RoadmapTimeline } from "@/components/roadmap-timeline"
 import {
   Plus,
   X,
@@ -29,6 +30,10 @@ import {
   ArrowLeft,
   HelpCircle,
   Brain,
+  Download,
+  Share,
+  Clock,
+  Award,
 } from "lucide-react"
 
 // Assessment Questions
@@ -172,6 +177,8 @@ export default function CareerPage() {
   const [customSkill, setCustomSkill] = useState("")
   const [customInterest, setCustomInterest] = useState("")
   const [targetRole, setTargetRole] = useState("")
+  const [roadmapData, setRoadmapData] = useState<any>(null)
+  const [showRoadmap, setShowRoadmap] = useState(false)
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
@@ -259,6 +266,7 @@ export default function CareerPage() {
       return
     }
 
+    setIsLoading(true)
     try {
       const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/generate", {
         method: "POST",
@@ -277,16 +285,16 @@ export default function CareerPage() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const roadmapData = await response.json()
-      console.log("Roadmap generated:", roadmapData)
-      
-      // Navigate to roadmap page or show results
-      // For now, just show a success message
-      alert("Roadmap generated successfully! Check the console for details.")
+      const data = await response.json()
+      console.log("Roadmap generated:", data)
+      setRoadmapData(data)
+      setShowRoadmap(true)
       
     } catch (error) {
       console.error("Failed to generate roadmap:", error)
       alert("Failed to generate roadmap. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -428,6 +436,83 @@ export default function CareerPage() {
                 setAnswers({})
               }}
               className="mr-4 bg-transparent"
+            >
+              Back to Career Tools
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Roadmap Display Screen
+  if (showRoadmap && roadmapData) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center space-y-4">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {roadmapData.career_title || targetRole} Learning Roadmap
+            </h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Your personalized learning journey to become a {roadmapData.career_title || targetRole}
+            </p>
+          </div>
+
+          {/* Roadmap Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                <p className="text-2xl font-bold text-primary">{roadmapData.total_duration || "6-12 months"}</p>
+                <p className="text-sm text-muted-foreground">Total Duration</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <Award className="h-8 w-8 mx-auto mb-2 text-purple-500" />
+                <p className="text-2xl font-bold text-primary capitalize">{roadmapData.difficulty_level || "Intermediate"}</p>
+                <p className="text-sm text-muted-foreground">Difficulty Level</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <Target className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                <p className="text-2xl font-bold text-primary">{roadmapData.steps?.length || 8}</p>
+                <p className="text-sm text-muted-foreground">Learning Steps</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-4">
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+              <Download className="mr-2 h-4 w-4" />
+              Download Roadmap
+            </Button>
+            <Button variant="outline">
+              <Share className="mr-2 h-4 w-4" />
+              Share Roadmap
+            </Button>
+          </div>
+
+          {/* Roadmap Timeline */}
+          {roadmapData.steps && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-center">Your Learning Path</h2>
+              <RoadmapTimeline steps={roadmapData.steps} />
+            </div>
+          )}
+
+          {/* Back Button */}
+          <div className="text-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRoadmap(false)
+                setRoadmapData(null)
+              }}
+              className="bg-transparent"
             >
               Back to Career Tools
             </Button>
