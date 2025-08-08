@@ -229,25 +229,39 @@ export default function LearnPage() {
 
   // Implement handleActionClick
   const handleActionClick = async (action: string, lessonId: number) => {
+    console.log("handleActionClick called with:", { action, lessonId })
     setIsLoading(true)
     
     try {
-      const res = await fetch(
-        `${API}/api/lesson/${lessonId}/${action}`,
-        { method: "GET" }
-      )
-      if (!res.ok) throw new Error(await res.text())
-      const { content } = await res.json()
+      const url = `${API}/api/lesson/${lessonId}/${action}`
+      console.log("Making API call to:", url)
+      
+      const res = await fetch(url, { method: "GET" })
+      console.log("Response status:", res.status)
+      console.log("Response headers:", Object.fromEntries(res.headers.entries()))
+      
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error("API error:", errorText)
+        throw new Error(`${res.status}: ${errorText}`)
+      }
+      
+      const data = await res.json()
+      console.log("API response:", data)
+      
+      const content = data.content || data.response || `Generated ${action} for your document.`
       
       setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
-          content: content || `Generated ${action} for your document.`,
+          content: content,
           sender: "ai",
           timestamp: new Date(),
         },
       ])
+      
+      console.log("Message added successfully")
     } catch (error) {
       console.error(`Failed to generate ${action}:`, error)
       let errorMessage = `Failed to generate ${action}. Please try again.`
@@ -483,7 +497,10 @@ export default function LearnPage() {
                                     key={action}
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => handleActionClick(action, message.lesson_id!)}
+                                    onClick={() => {
+                                      console.log("Button clicked:", action, "lesson_id:", message.lesson_id)
+                                      handleActionClick(action, message.lesson_id!)
+                                    }}
                                     disabled={isLoading || isUploading}
                                   >
                                     {action.charAt(0).toUpperCase() + action.slice(1)}
