@@ -248,8 +248,24 @@ export default function LearnPage() {
       
       const data = await res.json()
       console.log("API response:", data)
+      console.log("API response type:", typeof data)
+      console.log("API response keys:", Object.keys(data))
       
-      const content = data.content || data.response || `Generated ${action} for your document.`
+      let content = ""
+      if (typeof data === 'string') {
+        content = data
+      } else if (data.content) {
+        content = data.content
+      } else if (data.response) {
+        content = data.response
+      } else if (data.cards) {
+        // Handle flashcards format
+        content = JSON.stringify(data.cards, null, 2)
+      } else {
+        content = `Generated ${action} for your document.`
+      }
+      
+      console.log("Final content to display:", content)
       
       setMessages((prev: Message[]) => [
         ...prev,
