@@ -100,6 +100,7 @@ export default function LearnPage() {
   const [isDragOver, setIsDragOver] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const footerFileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
 
   useEffect(() => {
@@ -534,7 +535,7 @@ export default function LearnPage() {
                       <Button 
                         variant="outline" 
                         size="icon" 
-                        onClick={() => fileInputRef.current?.click()} 
+                        onClick={() => footerFileInputRef.current?.click()} 
                         className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
                         disabled={isUploading}
                       >
@@ -555,6 +556,16 @@ export default function LearnPage() {
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
+                    {/* Hidden file input for footer upload button */}
+                    <Input
+                      ref={footerFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf"
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                      className="hidden"
+                      id="footer-file-upload"
+                    />
                   </div>
                 </div>
               </CardContent>
