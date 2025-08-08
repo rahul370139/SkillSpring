@@ -103,6 +103,8 @@ export default function LearnPage() {
   const [appliedExperienceLevel, setAppliedExperienceLevel] = useState("intermediate")
   const [appliedFramework, setAppliedFramework] = useState("general")
   const [isDragOver, setIsDragOver] = useState(false)
+  const [currentLessonId, setCurrentLessonId] = useState<number | null>(null)
+  const [pdfContext, setPdfContext] = useState<string>("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const footerFileInputRef = useRef<HTMLInputElement>(null)
@@ -160,8 +162,10 @@ export default function LearnPage() {
       
       console.log("Upload successful, response:", distillResp)
 
-      // ① Store file locally
+      // ① Store file locally and set lesson context
       setUploadedFiles(prev => [...prev, supportedFiles[0]])
+      setCurrentLessonId(distillResp.lesson_id)
+      setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
       // ② Push a "system" message with action buttons
       setMessages((prev: Message[]) => [
@@ -331,6 +335,23 @@ export default function LearnPage() {
     setIsLoading(true)
 
     try {
+      // Build context from uploaded PDF and generated content
+      let context = ""
+      if (currentLessonId) {
+        context += `\n\n📄 **Uploaded Document Context:** ${pdfContext}`
+      }
+      
+      // Add recent generated content to context
+      const recentContent = messages
+        .filter(msg => msg.sender === "ai" && msg.content.length > 50)
+        .slice(-3) // Last 3 AI messages
+        .map(msg => msg.content)
+        .join("\n\n")
+      
+      if (recentContent) {
+        context += `\n\n📚 **Recent Generated Content:**\n${recentContent}`
+      }
+
       const response = await fetch(`${API}/api/chat`, {
         method: "POST",
         headers: {
@@ -340,7 +361,9 @@ export default function LearnPage() {
           message: inputMessage,
           user_id: user?.id || "anonymous-user",
           explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-          framework: appliedFramework
+          framework: appliedFramework,
+          lesson_id: currentLessonId,
+          context: context
         }),
       })
 
@@ -396,9 +419,11 @@ export default function LearnPage() {
   const handleClearChat = () => {
     setMessages([])
     setUploadedFiles([])
+    setCurrentLessonId(null)
+    setPdfContext("")
     toast({
       title: "Chat cleared",
-      description: "All messages have been removed",
+      description: "All messages and context have been removed",
     })
   }
 
