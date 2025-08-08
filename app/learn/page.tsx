@@ -92,6 +92,50 @@ async function uploadToDistill(file: File, ownerId: string) {
   }
 }
 
+/** POST /api/chat/upload - integrates PDF into chat conversation */
+async function uploadFileForChat(file: File, userId: string, conversationId: string | null, explanationLevel: string) {
+  console.log("uploadFileForChat called with:", { fileName: file.name, userId, conversationId, explanationLevel })
+  
+  const form = new FormData()
+  form.append("file", file)
+  form.append("user_id", userId)
+  if (conversationId) form.append("conversation_id", conversationId)
+  form.append("explanation_level", explanationLevel)
+
+  console.log("Uploading to chat:", `${API}/api/chat/upload`)
+  
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 120000)
+
+  try {
+    const res = await fetch(`${API}/api/chat/upload`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    })
+    
+    clearTimeout(timeoutId)
+    console.log("Chat upload response status:", res.status)
+    
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.error("Chat upload error:", errorText)
+      throw new Error(`${res.status}: ${errorText}`)
+    }
+    
+    const data = await res.json()
+    console.log("Chat upload success:", data)
+    return data as { conversation_id: string; response: string }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    console.error("Chat upload failed with error:", error)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error("Chat upload timeout. Please try again.")
+    }
+    throw error
+  }
+}
+
 export default function LearnPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
@@ -104,6 +148,7 @@ export default function LearnPage() {
   const [appliedFramework, setAppliedFramework] = useState("general")
   const [isDragOver, setIsDragOver] = useState(false)
   const [currentLessonId, setCurrentLessonId] = useState<number | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [pdfContext, setPdfContext] = useState<string>("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -157,21 +202,32 @@ export default function LearnPage() {
         size: supportedFiles[0].size
       })
       
-      // NOTE: one-file upload for MVP
+      // Step 1: Call /api/distill to persist lesson and get lesson_id
       const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "anonymous-user")
-      
-      console.log("Upload successful, response:", distillResp)
+      console.log("Distill upload successful, response:", distillResp)
 
-      // ① Store file locally and set lesson context
+      // Step 2: Call /api/chat/upload to integrate PDF into chat conversation
+      const explanationLevel = appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : "senior"
+      const chatUploadResp = await uploadFileForChat(supportedFiles[0], user?.id || "anonymous-user", conversationId, explanationLevel)
+      console.log("Chat upload successful, response:", chatUploadResp)
+
+      // Store file locally and set contexts
       setUploadedFiles(prev => [...prev, supportedFiles[0]])
       setCurrentLessonId(distillResp.lesson_id)
+      setConversationId(chatUploadResp.conversation_id)
       setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
-      // ② Push a "system" message with action buttons
+      // Add the AI's response from chat upload to the conversation
       setMessages((prev: Message[]) => [
         ...prev,
         {
           id: Date.now().toString(),
+          content: chatUploadResp.response,
+          sender: "ai",
+          timestamp: new Date(),
+        },
+        {
+          id: (Date.now() + 1).toString(),
           content: `✅ ${supportedFiles[0].name} uploaded and processed. What would you like to do?`,
           sender: "ai",
           timestamp: new Date(),
@@ -184,7 +240,7 @@ export default function LearnPage() {
       
       toast({
         title: "File Processed Successfully",
-        description: `${supportedFiles[0].name} uploaded and processed. You can now generate summaries, quizzes, and more!`,
+        description: `${supportedFiles[0].name} uploaded and integrated into chat. You can now generate summaries, quizzes, and more!`,
       })
     } catch (err) {
       console.error("Upload failed:", err)
@@ -287,6 +343,7 @@ export default function LearnPage() {
       
       console.log("Final content to display:", content)
       
+      // Add the generated content to chat
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -296,6 +353,32 @@ export default function LearnPage() {
           timestamp: new Date(),
         },
       ])
+      
+      // Also send the generated content to the chat API so the AI can reference it
+      if (conversationId) {
+        try {
+          const chatResponse = await fetch(`${API}/api/chat`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: `Here is the ${action} I generated: ${content}`,
+              user_id: user?.id || "anonymous-user",
+              conversation_id: conversationId,
+              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+              framework: appliedFramework,
+              lesson_id: lessonId,
+            }),
+          })
+          
+          if (chatResponse.ok) {
+            console.log("Generated content sent to chat context successfully")
+          }
+        } catch (error) {
+          console.error("Failed to send generated content to chat:", error)
+        }
+      }
       
       console.log("Message added successfully")
     } catch (error) {
@@ -360,6 +443,7 @@ export default function LearnPage() {
         body: JSON.stringify({
           message: inputMessage,
           user_id: user?.id || "anonymous-user",
+          conversation_id: conversationId,
           explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
           framework: appliedFramework,
           lesson_id: currentLessonId,
@@ -420,6 +504,7 @@ export default function LearnPage() {
     setMessages([])
     setUploadedFiles([])
     setCurrentLessonId(null)
+    setConversationId(null)
     setPdfContext("")
     toast({
       title: "Chat cleared",
