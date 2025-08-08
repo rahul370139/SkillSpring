@@ -31,12 +31,12 @@ export default function Landing() {
             </div>
           </div>
 
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 blue-dark:text-white leading-tight">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white leading-tight">
             Master Your Future with
             <br />
             Smart Learning
           </h2>
-          <p className="text-base text-slate-600 blue-dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-base text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
             Transform your career with AI-powered micro-lessons, personalized career paths, and intelligent progress
             tracking. Learn faster, grow smarter, achieve more.
           </p>
@@ -56,7 +56,7 @@ export default function Landing() {
             <Button
               variant="outline"
               size="lg"
-              className="px-8 py-6 text-lg font-semibold border-2 hover:bg-slate-50 blue-dark:hover:bg-slate-800 transition-all duration-300 bg-transparent"
+              className="px-8 py-6 text-lg font-semibold border-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 bg-transparent"
             >
               Explore Careers
             </Button>
@@ -67,15 +67,15 @@ export default function Landing() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto pt-16">
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600">10K+</div>
-            <div className="text-slate-600 blue-dark:text-slate-300">Active Learners</div>
+            <div className="text-slate-600 dark:text-slate-300">Active Learners</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">500+</div>
-            <div className="text-slate-600 blue-dark:text-slate-300">Career Paths</div>
+            <div className="text-slate-600 dark:text-slate-300">Career Paths</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-indigo-600">95%</div>
-            <div className="text-slate-600 blue-dark:text-slate-300">Success Rate</div>
+            <div className="text-slate-600 dark:text-slate-300">Success Rate</div>
           </div>
         </div>
       </section>
@@ -83,8 +83,8 @@ export default function Landing() {
       {/* Features Section - Now with Clickable Cards */}
       <section className="space-y-12">
         <div className="text-center space-y-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 blue-dark:text-white">Why Choose TrainPI?</h2>
-          <p className="text-lg text-slate-600 blue-dark:text-slate-300 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">Why Choose TrainPI?</h2>
+          <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
             Experience the future of learning with our cutting-edge AI technology
           </p>
         </div>
@@ -92,17 +92,17 @@ export default function Landing() {
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {/* Clickable Micro-Learning Card */}
           <Link href="/learn" className="block">
-            <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-indigo-50 blue-dark:from-blue-950/50 blue-dark:to-indigo-950/50 cursor-pointer hover:-translate-y-2">
+            <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 cursor-pointer hover:-translate-y-2">
               <CardHeader>
-                <div className="rounded-full bg-blue-100 blue-dark:bg-blue-900 p-3 w-fit group-hover:scale-110 transition-transform">
-                  <BookOpen className="h-6 w-6 text-blue-600 blue-dark:text-blue-400" />
+                <div className="rounded-full bg-blue-100 dark:bg-blue-900 p-3 w-fit group-hover:scale-110 transition-transform">
+                  <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <CardTitle className="text-xl group-hover:text-blue-600 blue-dark:group-hover:text-blue-400 transition-colors">
+                <CardTitle className="text-xl group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   AI-Powered Micro-Learning
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600 blue-dark:text-slate-300 mb-4">
+                <p className="text-slate-600 dark:text-slate-300 mb-4">
                   Transform any document into bite-sized, interactive lessons with flashcards and quizzes powered by
                   advanced AI.
                 </p>
