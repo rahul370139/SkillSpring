@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { dashboardAPI, userAPI, recommendationAPI, learnAPI } from "@/lib/api"
 import { useSession } from "@supabase/auth-helpers-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,13 +21,7 @@ import { Settings, LogOut } from "lucide-react"
 // API Functions with error handling
 const updateUserRole = async (userId: string, role: string) => {
   try {
-    const response = await fetch(`https://trainbackend-production.up.railway.app/api/users/${userId}/role`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    })
-    if (!response.ok) throw new Error("Failed to update user role")
-    return await response.json()
+    return await userAPI.updateUserRole(userId, role)
   } catch (error) {
     console.error("Error updating user role:", error)
     return null
@@ -35,16 +30,7 @@ const updateUserRole = async (userId: string, role: string) => {
 
 const completeLesson = async (lessonId: string, userId: string, progressPercentage = 100.0) => {
   try {
-    const response = await fetch(`https://trainbackend-production.up.railway.app/api/lessons/${lessonId}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: userId,
-        progress_percentage: progressPercentage,
-      }),
-    })
-    if (!response.ok) throw new Error("Failed to complete lesson")
-    return await response.json()
+    return await learnAPI.completeLesson(lessonId, userId, progressPercentage)
   } catch (error) {
     console.error("Error completing lesson:", error)
     return null
@@ -53,9 +39,7 @@ const completeLesson = async (lessonId: string, userId: string, progressPercenta
 
 const getUserProgress = async (userId: string) => {
   try {
-    const response = await fetch(`https://trainbackend-production.up.railway.app/api/users/${userId}/progress`)
-    if (!response.ok) throw new Error("Failed to get user progress")
-    return await response.json()
+    return await dashboardAPI.getUserProgress(userId)
   } catch (error) {
     console.error("Error getting user progress:", error)
     return null
@@ -64,17 +48,11 @@ const getUserProgress = async (userId: string) => {
 
 const getRecommendations = async (userId: string, userRole: string, completedLessons: string[] = []) => {
   try {
-    const response = await fetch("https://trainbackend-production.up.railway.app/api/recommendations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: userId,
-        user_role: userRole,
-        completed_lessons: completedLessons,
-      }),
+    return await recommendationAPI.getGeneralRecommendations({
+      user_id: userId,
+      user_role: userRole,
+      completed_lessons: completedLessons,
     })
-    if (!response.ok) throw new Error("Failed to get recommendations")
-    return await response.json()
   } catch (error) {
     console.error("Error getting recommendations:", error)
     return null

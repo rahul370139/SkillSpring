@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { careerAPI } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -102,25 +103,14 @@ export default function CareerDiscoverPage() {
       // Submit and get results
       setIsLoading(true)
       try {
-        const response = await fetch("https://trainbackend-production.up.railway.app/api/career/match", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: session.user.id,
-            answers: Object.entries(answers).map(([question_id, rating]) => ({
-              question_id: Number.parseInt(question_id),
-              rating: Number.parseInt(rating),
-            })),
-          }),
+        const data = await careerAPI.matchCareer({
+          user_id: session.user.id,
+          answers: Object.entries(answers).map(([question_id, rating]) => ({
+            question_id: Number.parseInt(question_id),
+            rating: Number.parseInt(rating),
+          })),
         })
-
-        if (!response.ok) {
-          throw new Error("Failed to get career matches")
-        }
-
-        const data = await response.json()
+        
         setCareers(data.career_matches || [])
         setShowResults(true)
       } catch (error) {

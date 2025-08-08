@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import { chatAPI } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -68,23 +69,11 @@ export function ChatInterface({ files, selectedLevel, selectedFramework }: ChatI
     setIsLoading(true)
 
     try {
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: inputMessage,
-          user_id: "user-123",
-          explanation_level: selectedLevel === "beginner" ? "5_year_old" : selectedLevel === "intermediate" ? "intern" : "senior"
-        }),
+      const data = await chatAPI.sendMessage({
+        message: inputMessage,
+        user_id: "user-123",
+        explanation_level: selectedLevel === "beginner" ? "5_year_old" : selectedLevel === "intermediate" ? "intern" : "senior"
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to send message")
-      }
-
-      const data = await response.json()
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

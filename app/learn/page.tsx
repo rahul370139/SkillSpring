@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { learnAPI, chatAPI } from "@/lib/api";
 import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,49 +61,17 @@ interface Message {
   workflowData?: string[]
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
-
 /** POST /api/distill  – returns { lesson_id, actions[] } */
 async function uploadToDistill(file: File, ownerId: string) {
   console.log("uploadToDistill called with:", { fileName: file.name, fileSize: file.size, fileType: file.type, ownerId })
   
-  const formData = new FormData();
-  formData.append("file", file);
-
-  console.log("Uploading to:", `${API}/api/distill?owner_id=${ownerId}`)
-  console.log("File:", file.name, "Size:", file.size, "Type:", file.type)
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for Railway cold-start
-
   try {
-    console.log("Making fetch request...")
-    const r = await fetch(`${API}/api/distill?owner_id=${ownerId}`, {
-      method: "POST",
-      body: formData,
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
-    console.log("Response status:", r.status)
-    console.log("Response headers:", Object.fromEntries(r.headers.entries()))
-    
-    if (!r.ok) {
-      const errorText = await r.text()
-      console.error("Upload error:", errorText)
-      throw new Error(`${r.status}: ${errorText}`)
-    }
-    
-    const result = await r.json()
-    console.log("Upload success:", result)
-    return result as { lesson_id: number; actions: string[] };
+    const data = await learnAPI.distill(file, ownerId)
+    console.log("Distill upload successful, response:", data)
+    return data
   } catch (error) {
-    clearTimeout(timeoutId);
-    console.error("Upload failed with error:", error)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error("Upload timeout. Please try again.")
-    }
-    throw error;
+    console.error("Distill upload failed with error:", error)
+    throw error
   }
 }
 
@@ -110,43 +79,12 @@ async function uploadToDistill(file: File, ownerId: string) {
 async function uploadFileForChat(file: File, userId: string, conversationId: string | null, explanationLevel: string) {
   console.log("uploadFileForChat called with:", { fileName: file.name, userId, conversationId, explanationLevel })
   
-  const form = new FormData()
-  form.append("file", file)
-  if (conversationId) form.append("conversation_id", conversationId)
-  form.append("explanation_level", explanationLevel)
-
-  // Build URL with user_id as query parameter
-  const url = `${API}/api/chat/upload?user_id=${encodeURIComponent(userId)}`
-  console.log("Uploading to chat:", url)
-  
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 120000)
-
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      body: form,
-      signal: controller.signal,
-    })
-    
-    clearTimeout(timeoutId)
-    console.log("Chat upload response status:", res.status)
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      console.error("Chat upload error:", errorText)
-      throw new Error(`${res.status}: ${errorText}`)
-    }
-    
-    const data = await res.json()
+    const data = await chatAPI.uploadFile(file, userId, conversationId || undefined, explanationLevel)
     console.log("Chat upload success:", data)
     return data as { conversation_id: string; response: string }
   } catch (error) {
-    clearTimeout(timeoutId)
     console.error("Chat upload failed with error:", error)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error("Chat upload timeout. Please try again.")
-    }
     throw error
   }
 }
@@ -209,7 +147,6 @@ export default function LearnPage() {
     
     try {
       console.log("Starting file upload:", supportedFiles[0].name)
-      console.log("API URL:", API)
       console.log("User ID:", user?.id || "anonymous-user")
       console.log("File details:", {
         name: supportedFiles[0].name,
@@ -228,26 +165,16 @@ export default function LearnPage() {
 
       // Step 3: Call /api/chat/ingest-distilled to load the lesson content into chat context
       try {
-        const ingestResponse = await fetch(`${API}/api/chat/ingest-distilled`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: user?.id || "anonymous-user",
+        const ingestData = await chatAPI.ingestDistilled(
+          distillResp.lesson_id.toString(),
+          user?.id || "anonymous-user",
+          {
             conversation_id: chatUploadResp.conversation_id,
-            lesson_id: distillResp.lesson_id,
             explanation_level: explanationLevel,
             framework: appliedFramework
-          }),
-        })
-        
-        if (ingestResponse.ok) {
-          const ingestData = await ingestResponse.json()
-          console.log("Lesson content ingested into chat:", ingestData)
-        } else {
-          console.warn("Failed to ingest lesson content:", await ingestResponse.text())
-        }
+          }
+        )
+        console.log("Lesson content ingested into chat:", ingestData)
       } catch (error) {
         console.warn("Error ingesting lesson content:", error)
       }
@@ -334,20 +261,9 @@ export default function LearnPage() {
     setIsLoading(true)
     
     try {
-      const url = `${API}/api/lesson/${lessonId}/${action}`
-      console.log("Making API call to:", url)
+      console.log("Making API call to get lesson content")
       
-      const res = await fetch(url, { method: "GET" })
-      console.log("Response status:", res.status)
-      console.log("Response headers:", Object.fromEntries(res.headers.entries()))
-      
-      if (!res.ok) {
-        const errorText = await res.text()
-        console.error("API error:", errorText)
-        throw new Error(`${res.status}: ${errorText}`)
-      }
-      
-      const data = await res.json()
+      const data = await learnAPI.getLessonContent(lessonId.toString(), action)
       console.log("API response:", data)
       console.log("API response type:", typeof data)
       console.log("API response keys:", Object.keys(data))
@@ -421,17 +337,13 @@ export default function LearnPage() {
         // Send to chat context
         if (conversationId) {
           try {
-            await fetch(`${API}/api/chat`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: `Here is the summary: ${bullets.join("; ")}`,
-                user_id: user?.id || "anonymous-user",
-                conversation_id: conversationId,
-                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-                framework: appliedFramework,
-                lesson_id: lessonId,
-              })
+            await chatAPI.sendMessage({
+              message: `Here is the summary: ${bullets.join("; ")}`,
+              user_id: user?.id || "anonymous-user",
+              conversation_id: conversationId,
+              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+              framework: appliedFramework,
+              lesson_id: lessonId,
             })
             console.log("Summary sent to chat context")
           } catch (error) {
@@ -455,17 +367,13 @@ export default function LearnPage() {
         // Send to chat context
         if (conversationId) {
           try {
-            await fetch(`${API}/api/chat`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: `Here are the flashcards: ${flashcards.map((card: any) => `${card.question} - ${card.answer}`).join("; ")}`,
-                user_id: user?.id || "anonymous-user",
-                conversation_id: conversationId,
-                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-                framework: appliedFramework,
-                lesson_id: lessonId,
-              })
+            await chatAPI.sendMessage({
+              message: `Here are the flashcards: ${flashcards.map((card: any) => `${card.question} - ${card.answer}`).join("; ")}`,
+              user_id: user?.id || "anonymous-user",
+              conversation_id: conversationId,
+              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+              framework: appliedFramework,
+              lesson_id: lessonId,
             })
             console.log("Flashcards sent to chat context")
           } catch (error) {
@@ -489,17 +397,13 @@ export default function LearnPage() {
         // Send to chat context
         if (conversationId) {
           try {
-            await fetch(`${API}/api/chat`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: `Here is the quiz: ${quizItems.map((item: any) => item.question).join("; ")}`,
-                user_id: user?.id || "anonymous-user",
-                conversation_id: conversationId,
-                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-                framework: appliedFramework,
-                lesson_id: lessonId,
-              })
+            await chatAPI.sendMessage({
+              message: `Here is the quiz: ${quizItems.map((item: any) => item.question).join("; ")}`,
+              user_id: user?.id || "anonymous-user",
+              conversation_id: conversationId,
+              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+              framework: appliedFramework,
+              lesson_id: lessonId,
             })
             console.log("Quiz sent to chat context")
           } catch (error) {
@@ -524,17 +428,13 @@ export default function LearnPage() {
         // Send to chat context
         if (conversationId) {
           try {
-            await fetch(`${API}/api/chat`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: `Here is the workflow: ${workflowSteps.join("; ")}`,
-                user_id: user?.id || "anonymous-user",
-                conversation_id: conversationId,
-                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-                framework: appliedFramework,
-                lesson_id: lessonId,
-              })
+            await chatAPI.sendMessage({
+              message: `Here is the workflow: ${workflowSteps.join("; ")}`,
+              user_id: user?.id || "anonymous-user",
+              conversation_id: conversationId,
+              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+              framework: appliedFramework,
+              lesson_id: lessonId,
             })
             console.log("Workflow sent to chat context")
           } catch (error) {
@@ -585,18 +485,9 @@ export default function LearnPage() {
       let lessonContent = ""
       if (currentLessonId && conversationId) {
         try {
-          const lessonResponse = await fetch(`${API}/api/chat/lesson/${currentLessonId}/content`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          })
-          
-          if (lessonResponse.ok) {
-            const lessonData = await lessonResponse.json()
-            lessonContent = lessonData.content || ""
-            console.log("Lesson content loaded for chat:", lessonContent.substring(0, 200) + "...")
-          }
+          const lessonData = await learnAPI.getLessonContentForChat(currentLessonId.toString())
+          lessonContent = lessonData.content || ""
+          console.log("Lesson content loaded for chat:", lessonContent.substring(0, 200) + "...")
         } catch (error) {
           console.warn("Failed to load lesson content for chat:", error)
         }
@@ -623,27 +514,15 @@ export default function LearnPage() {
         context += `\n\n📚 **Recent Generated Content:**\n${recentContent}`
       }
 
-      const response = await fetch(`${API}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: inputMessage,
-          user_id: user?.id || "anonymous-user",
-          conversation_id: conversationId,
-          explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-          framework: appliedFramework,
-          lesson_id: currentLessonId,
-          context: context
-        }),
+      const data = await chatAPI.sendMessage({
+        message: inputMessage,
+        user_id: user?.id || "anonymous-user",
+        conversation_id: conversationId,
+        explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+        framework: appliedFramework,
+        lesson_id: currentLessonId,
+        context: context
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to send message")
-      }
-
-      const data = await response.json()
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -705,18 +584,9 @@ export default function LearnPage() {
     const loadConversations = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(`${API}/api/chat/conversations/${user.id}`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          })
-          
-          if (response.ok) {
-            const conversations = await response.json()
-            console.log("Loaded existing conversations:", conversations)
-            // You can use this to show conversation history in a sidebar
-          }
+          const conversations = await chatAPI.getUserConversations(user.id)
+          console.log("Loaded existing conversations:", conversations)
+          // You can use this to show conversation history in a sidebar
         } catch (error) {
           console.warn("Failed to load conversations:", error)
         }
