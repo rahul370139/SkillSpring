@@ -29,6 +29,7 @@ import {
   ArrowLeft,
   HelpCircle,
   Brain,
+  Upload,
 } from "lucide-react"
 
 // Assessment Questions
@@ -298,16 +299,16 @@ export default function CareerPage() {
   // Assessment Loading Screen
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center">
         <div className="max-w-2xl mx-auto text-center space-y-8">
           <div className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
               <Zap className="h-8 w-8 text-white animate-pulse" />
             </div>
-            <h2 className="text-2xl font-bold">Analyzing Your Responses...</h2>
-            <p className="text-muted-foreground">Finding the perfect career matches for you</p>
+            <h2 className="text-2xl font-bold text-white">Analyzing Your Responses...</h2>
+            <p className="text-blue-200">Finding the perfect career matches for you</p>
           </div>
-          <div className="w-full bg-secondary rounded-full h-2">
+          <div className="w-full bg-slate-700 rounded-full h-2">
             <div
               className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full animate-pulse"
               style={{ width: "75%" }}
@@ -321,64 +322,61 @@ export default function CareerPage() {
   // Assessment Results Screen
   if (showResults) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-8">
-          <div className="text-center space-y-4">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Your Career Matches
-            </h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Based on your responses, here are the careers that align best with your interests and preferences.
-            </p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="text-center space-y-4">
+              <h1 className="text-3xl font-bold text-white">
+                Your Career Matches
+              </h1>
+              <p className="text-blue-200 max-w-2xl mx-auto">
+                Based on your responses, here are the careers that align best with your interests and preferences.
+              </p>
+            </div>
 
           <div className="grid gap-6">
             {mockCareerResults.map((career, index) => (
-              <Card key={index} className="group hover:shadow-lg transition-all duration-300 border-0 shadow-md">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                        <career.icon className="h-6 w-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                          {career.title}
-                        </CardTitle>
-                        <CardDescription className="text-sm">{career.description}</CardDescription>
-                        <p className="text-sm font-medium text-green-600 dark:text-green-400">{career.salary}</p>
-                      </div>
+              <div key={index} className="group hover:shadow-lg transition-all duration-300 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                      <career.icon className="h-6 w-6" />
                     </div>
-                    <div className="text-right">
-                      <Badge
-                        variant="secondary"
-                        className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white"
-                      >
-                        {career.match}%
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">Match</p>
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
+                        {career.title}
+                      </h3>
+                      <p className="text-sm text-blue-200">{career.description}</p>
+                      <p className="text-sm font-medium text-green-400">{career.salary}</p>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium mb-2">Key Skills:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {career.skills.map((skill, skillIndex) => (
-                          <Badge key={skillIndex} variant="outline" className="text-xs">
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                      Generate Learning Roadmap
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                  <div className="text-right">
+                    <Badge
+                      variant="secondary"
+                      className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                    >
+                      {career.match}%
+                    </Badge>
+                    <p className="text-xs text-blue-300 mt-1">Match</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-2 text-blue-200">Key Skills:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {career.skills.map((skill, skillIndex) => (
+                        <Badge key={skillIndex} variant="outline" className="text-xs bg-blue-600/20 border-blue-400/30 text-blue-200">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                    Generate Learning Roadmap
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -391,7 +389,7 @@ export default function CareerPage() {
                 setCurrentStep(0)
                 setAnswers({})
               }}
-              className="mr-4 bg-transparent"
+              className="mr-4 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
             >
               Back to Career Tools
             </Button>
@@ -408,24 +406,23 @@ export default function CareerPage() {
     const progress = ((currentStep + 1) / assessmentQuestions.length) * 100
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto space-y-8">
-          <div className="text-center space-y-4">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Career Assessment
-            </h1>
-            <p className="text-muted-foreground">
-              Question {currentStep + 1} of {assessmentQuestions.length}
-            </p>
-            <Progress value={progress} className="w-full" />
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto space-y-8">
+            <div className="text-center space-y-4">
+              <h1 className="text-3xl font-bold text-white">
+                Career Assessment
+              </h1>
+              <p className="text-blue-200">
+                Question {currentStep + 1} of {assessmentQuestions.length}
+              </p>
+              <Progress value={progress} className="w-full bg-slate-700" />
+            </div>
 
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl">Question {currentStep + 1}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <p className="text-lg leading-relaxed">{currentQuestion.question}</p>
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-8">
+            <div className="space-y-6">
+              <h2 className="text-xl font-semibold text-white">Question {currentStep + 1}</h2>
+              <p className="text-lg leading-relaxed text-blue-100">{currentQuestion.question}</p>
 
               <RadioGroup
                 value={answers[currentQuestion.id] || ""}
@@ -435,24 +432,24 @@ export default function CareerPage() {
                 {likertOptions.map((option) => (
                   <div
                     key={option.value}
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                    className="flex items-center space-x-3 p-4 rounded-lg hover:bg-slate-700/50 transition-colors border border-slate-600/30"
                   >
-                    <RadioGroupItem value={option.value} id={option.value} />
-                    <Label htmlFor={option.value} className="flex-1 cursor-pointer text-sm">
+                    <RadioGroupItem value={option.value} id={option.value} className="text-blue-500" />
+                    <Label htmlFor={option.value} className="flex-1 cursor-pointer text-sm text-blue-100">
                       {option.label}
                     </Label>
                   </div>
                 ))}
               </RadioGroup>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           <div className="flex justify-between">
             <Button
               variant="outline"
               onClick={handlePrevious}
               disabled={currentStep === 0}
-              className="flex items-center gap-2 bg-transparent"
+              className="flex items-center gap-2 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
             >
               <ArrowLeft className="h-4 w-4" />
               Previous
@@ -460,7 +457,7 @@ export default function CareerPage() {
             <Button
               onClick={handleNext}
               disabled={!canGoNext}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
             >
               {currentStep === assessmentQuestions.length - 1 ? "Get Results" : "Next"}
               <ArrowRight className="h-4 w-4" />
@@ -473,26 +470,183 @@ export default function CareerPage() {
 
   // Main Career Page with Roadmap Generator
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Career Roadmap Generator
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Create a personalized learning roadmap based on your skills, interests, and career goals.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center space-y-6 mb-12">
+            <h1 className="text-5xl font-bold text-white">
+              Career Planning
+            </h1>
+            <p className="text-xl text-blue-200 max-w-2xl mx-auto">
+              Define your career goals to get started
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <Tabs defaultValue="target" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="target">Target Role</TabsTrigger>
-                <TabsTrigger value="interests">Interests</TabsTrigger>
-                <TabsTrigger value="skills">Skills</TabsTrigger>
-              </TabsList>
+          {/* Main Form Container */}
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-8 space-y-8">
+            {/* Interests Section */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">What are your interests?</h2>
+              
+              {/* Suggested Interests */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                {getAvailableInterestSuggestions().slice(0, 3).map((interest) => (
+                  <Button
+                    key={interest.name}
+                    variant="outline"
+                    onClick={() => addInterest(interest.name)}
+                    className="bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30 hover:border-blue-400/50"
+                  >
+                    {interest.name}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Custom Interest Input */}
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Enter an interest"
+                  value={customInterest}
+                  onChange={(e) => setCustomInterest(e.target.value)}
+                  className="flex-1 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400"
+                />
+                <Button
+                  onClick={addCustomInterest}
+                  disabled={!customInterest.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Other
+                </Button>
+              </div>
+            </div>
+
+            {/* Skills Section */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">What skills do you have?</h2>
+              
+              {/* Suggested Skills */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                {getAvailableSkillSuggestions().slice(0, 3).map((skill) => (
+                  <Button
+                    key={skill.name}
+                    variant="outline"
+                    onClick={() => addSkill(skill.name)}
+                    className="bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30 hover:border-blue-400/50"
+                  >
+                    {skill.name}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Custom Skill Input */}
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Enter a skill"
+                  value={customSkill}
+                  onChange={(e) => setCustomSkill(e.target.value)}
+                  className="flex-1 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400"
+                />
+                <Button
+                  onClick={addCustomSkill}
+                  disabled={!customSkill.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Other
+                </Button>
+              </div>
+            </div>
+
+            {/* Resume Upload Section */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">Upload your resume</h2>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30 hover:border-blue-400/50 h-12"
+                >
+                  <Upload className="mr-2 h-5 w-5" />
+                  Upload Resume
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Other
+                </Button>
+              </div>
+            </div>
+
+            {/* Continue Button */}
+            <div className="pt-6">
+              <Button
+                onClick={() => setShowAssessment(true)}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white h-12 text-lg font-semibold"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+
+          {/* Selected Items Display */}
+          {(selectedInterests.length > 0 || selectedSkills.length > 0) && (
+            <div className="mt-8 bg-slate-800/30 rounded-xl p-6 border border-blue-500/20">
+              <h3 className="text-lg font-semibold text-white mb-4">Your Selections</h3>
+              
+              {selectedInterests.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-blue-200 mb-2">Interests:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedInterests.map((interest, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="bg-blue-600/30 text-blue-200 border-blue-400/30"
+                      >
+                        {interest}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeInterest(interest)}
+                          className="ml-2 h-4 w-4 p-0 hover:bg-blue-600/50"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {selectedSkills.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-blue-200 mb-2">Skills:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSkills.map((skill, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="bg-purple-600/30 text-purple-200 border-purple-400/30"
+                      >
+                        {skill}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeSkill(skill)}
+                          className="ml-2 h-4 w-4 p-0 hover:bg-purple-600/50"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
 
               <TabsContent value="target" className="space-y-6">
                 <Card className="border-0 shadow-lg">
