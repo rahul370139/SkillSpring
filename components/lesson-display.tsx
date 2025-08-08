@@ -72,7 +72,7 @@ export function LessonDisplay({ lesson }: { lesson: Lesson }) {
   )
 }
 
-function FlashcardPlayer({ flashcards }: { flashcards: Array<{ front: string; back: string }> }) {
+export function FlashcardPlayer({ flashcards }: { flashcards: Array<{ front: string; back: string }> }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
 
@@ -117,7 +117,7 @@ function FlashcardPlayer({ flashcards }: { flashcards: Array<{ front: string; ba
   )
 }
 
-function QuizPlayer({ quizItems }: { quizItems: Array<{ question: string; options: string[]; answer: string }> }) {
+export function QuizPlayer({ quizItems }: { quizItems: Array<{ question: string; options: string[]; answer: string }> }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)

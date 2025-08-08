@@ -34,6 +34,7 @@ import { useAuth } from "@/components/auth-provider"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { LessonDisplay } from "@/components/lesson-display"
+import { FlashcardPlayer, QuizPlayer } from "@/components/lesson-display"
 
 interface Message {
   id: string
@@ -41,7 +42,7 @@ interface Message {
   sender: "user" | "ai"
   timestamp: Date
   files?: File[]
-  type?: "text" | "file" | "actions" | "lesson"
+  type?: "text" | "file" | "actions" | "lesson" | "summary" | "flashcards" | "quiz" | "workflow"
   // NEW fields for messages of type="actions":
   lesson_id?: number
   actions?: string[]
@@ -49,12 +50,14 @@ interface Message {
   lessonData?: {
     lesson_id: string
     bullets: string[]
-    flashcards: Array<{ front: string; back: string }>
-    quiz: Array<{ question: string; options: string[]; answer: string }>
-    concept_map: any
     framework: string
     explanation_level: string
   }
+  // NEW fields for individual action types:
+  summaryData?: string[]
+  flashcardData?: Array<{ front: string; back: string }>
+  quizData?: Array<{ question: string; options: string[]; answer: string }>
+  workflowData?: string[]
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
@@ -357,7 +360,7 @@ export default function LearnPage() {
       
       // Handle different action types with proper rendering
       if (action === "lesson") {
-        // Use LessonDisplay component for complete lesson
+        // Use LessonDisplay component for complete lesson (summary only)
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -368,9 +371,6 @@ export default function LearnPage() {
             lessonData: {
               lesson_id: lessonId.toString(),
               bullets: data.content.bullets || [],
-              flashcards: data.content.flashcards || [],
-              quiz: data.content.quiz || [],
-              concept_map: data.content.concept_map || {},
               framework: appliedFramework,
               explanation_level: appliedExperienceLevel,
             }
@@ -386,7 +386,9 @@ export default function LearnPage() {
             id: Date.now().toString(),
             sender: "ai",
             timestamp: new Date(),
+            type: "summary",
             content: md,
+            summaryData: bullets,
           }
         ])
         
@@ -410,15 +412,17 @@ export default function LearnPage() {
             console.error("Failed to send summary to chat:", error)
           }
         }
-      } else {
-        // Default handling for other actions (flashcards, quiz, workflow)
+      } else if (action === "flashcards") {
+        // Handle flashcards with flip animation
+        const flashcards = data.content.cards || []
         setMessages((prev: Message[]) => [
           ...prev,
           {
             id: Date.now().toString(),
-            content: content,
             sender: "ai",
             timestamp: new Date(),
+            type: "flashcards",
+            flashcardData: flashcards,
           }
         ])
         
@@ -429,7 +433,7 @@ export default function LearnPage() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                message: `Here is the ${action} I generated: ${content}`,
+                message: `Here are the flashcards: ${flashcards.map((card: any) => `${card.question} - ${card.answer}`).join("; ")}`,
                 user_id: user?.id || "anonymous-user",
                 conversation_id: conversationId,
                 explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
@@ -437,9 +441,78 @@ export default function LearnPage() {
                 lesson_id: lessonId,
               })
             })
-            console.log(`${action} sent to chat context`)
+            console.log("Flashcards sent to chat context")
           } catch (error) {
-            console.error(`Failed to send ${action} to chat:`, error)
+            console.error("Failed to send flashcards to chat:", error)
+          }
+        }
+      } else if (action === "quiz") {
+        // Handle quiz with interactive questions
+        const quizItems = data.content.questions || []
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "quiz",
+            quizData: quizItems,
+          }
+        ])
+        
+        // Send to chat context
+        if (conversationId) {
+          try {
+            await fetch(`${API}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `Here is the quiz: ${quizItems.map((item: any) => item.question).join("; ")}`,
+                user_id: user?.id || "anonymous-user",
+                conversation_id: conversationId,
+                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+                framework: appliedFramework,
+                lesson_id: lessonId,
+              })
+            })
+            console.log("Quiz sent to chat context")
+          } catch (error) {
+            console.error("Failed to send quiz to chat:", error)
+          }
+        }
+      } else if (action === "workflow") {
+        // Handle workflow steps
+        const workflowSteps = Array.isArray(data.content) ? data.content : data.content.workflow || []
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "workflow",
+            content: workflowSteps.join("\n\n"),
+            workflowData: workflowSteps,
+          }
+        ])
+        
+        // Send to chat context
+        if (conversationId) {
+          try {
+            await fetch(`${API}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `Here is the workflow: ${workflowSteps.join("; ")}`,
+                user_id: user?.id || "anonymous-user",
+                conversation_id: conversationId,
+                explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
+                framework: appliedFramework,
+                lesson_id: lessonId,
+              })
+            })
+            console.log("Workflow sent to chat context")
+          } catch (error) {
+            console.error("Failed to send workflow to chat:", error)
           }
         }
       }
@@ -490,7 +563,7 @@ export default function LearnPage() {
       
       // Add recent generated content to context
       const recentContent = messages
-        .filter(msg => msg.sender === "ai" && msg.content.length > 50)
+        .filter(msg => msg.sender === "ai" && msg.content && msg.content.length > 50)
         .slice(-3) // Last 3 AI messages
         .map(msg => msg.content)
         .join("\n\n")
@@ -680,6 +753,14 @@ export default function LearnPage() {
                             {message.type === "lesson" && message.lessonData ? (
                               <div className="mt-3">
                                 <LessonDisplay lesson={message.lessonData} />
+                              </div>
+                            ) : message.type === "flashcards" && message.flashcardData ? (
+                              <div className="mt-3">
+                                <FlashcardPlayer flashcards={message.flashcardData} />
+                              </div>
+                            ) : message.type === "quiz" && message.quizData ? (
+                              <div className="mt-3">
+                                <QuizPlayer quizItems={message.quizData} />
                               </div>
                             ) : (
                               <div className="text-sm prose dark:prose-invert max-w-none">
