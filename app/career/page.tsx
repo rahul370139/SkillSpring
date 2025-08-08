@@ -254,6 +254,42 @@ export default function CareerPage() {
     }
   }
 
+  const handleGenerateRoadmap = async () => {
+    if (!targetRole || selectedInterests.length === 0 || selectedSkills.length === 0) {
+      return
+    }
+
+    try {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target_role: targetRole,
+          interests: selectedInterests,
+          skills: selectedSkills,
+          user_id: "user-123", // Replace with actual user ID when auth is implemented
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const roadmapData = await response.json()
+      console.log("Roadmap generated:", roadmapData)
+      
+      // Navigate to roadmap page or show results
+      // For now, just show a success message
+      alert("Roadmap generated successfully! Check the console for details.")
+      
+    } catch (error) {
+      console.error("Failed to generate roadmap:", error)
+      alert("Failed to generate roadmap. Please try again.")
+    }
+  }
+
   const groupedSkills = skillSuggestions.reduce(
     (acc, skill) => {
       if (!acc[skill.category]) {
@@ -726,6 +762,7 @@ export default function CareerPage() {
                 </div>
 
                 <Button
+                  onClick={handleGenerateRoadmap}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                   disabled={!targetRole || selectedInterests.length === 0 || selectedSkills.length === 0}
                 >
