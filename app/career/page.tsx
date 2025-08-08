@@ -268,7 +268,7 @@ export default function CareerPage() {
 
     setIsLoading(true)
     try {
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/generate", {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/unified", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -292,6 +292,40 @@ export default function CareerPage() {
       
     } catch (error) {
       console.error("Failed to generate roadmap:", error)
+      alert("Failed to generate roadmap. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGenerateRoadmapFromQuiz = async (careerTitle: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/unified", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target_role: careerTitle,
+          interests: ["technology", "problem-solving"], // Default interests from quiz
+          skills: [], // Will be determined by the backend based on career
+          user_id: "user-123", // Replace with actual user ID when auth is implemented
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("Roadmap generated from quiz:", data)
+      setRoadmapData(data)
+      setShowRoadmap(true)
+      setShowResults(false) // Hide quiz results, show roadmap
+      
+    } catch (error) {
+      console.error("Failed to generate roadmap from quiz:", error)
       alert("Failed to generate roadmap. Please try again.")
     } finally {
       setIsLoading(false)
@@ -416,7 +450,10 @@ export default function CareerPage() {
                         ))}
                       </div>
                     </div>
-                    <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                    <Button 
+                      onClick={() => handleGenerateRoadmapFromQuiz(career.title)}
+                      className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    >
                       Generate Learning Roadmap
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>

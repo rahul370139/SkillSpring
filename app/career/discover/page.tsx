@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { CareerStepper } from "@/components/career-stepper"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSession } from "@supabase/auth-helpers-react"
+import { RoadmapTimeline } from "@/components/roadmap-timeline"
+import { Download, Share, Clock, Award, Target } from "lucide-react"
 
 const questions = [
   {
@@ -82,6 +84,8 @@ export default function CareerDiscoverPage() {
   const [careers, setCareers] = useState<Career[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [roadmapData, setRoadmapData] = useState<any>(null)
+  const [showRoadmap, setShowRoadmap] = useState(false)
   const session = useSession()
 
   const handleAnswerChange = (questionId: number, value: string) => {
@@ -139,6 +143,40 @@ export default function CareerDiscoverPage() {
     console.log("View profile for career:", careerId)
   }
 
+  const handleGenerateRoadmap = async (careerTitle: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/unified", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target_role: careerTitle,
+          interests: ["technology", "problem-solving"], // Default interests from quiz
+          skills: [], // Will be determined by the backend based on career
+          user_id: session?.user?.id || "user-123",
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("Roadmap generated from quiz:", data)
+      setRoadmapData(data)
+      setShowRoadmap(true)
+      setShowResults(false) // Hide quiz results, show roadmap
+      
+    } catch (error) {
+      console.error("Failed to generate roadmap from quiz:", error)
+      alert("Failed to generate roadmap. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const canGoNext = answers[currentStep] !== undefined
 
   if (isLoading) {
@@ -187,9 +225,16 @@ export default function CareerDiscoverPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Button className="w-full" onClick={() => handleViewProfile(career.career)}>
                   View Career Profile
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => handleGenerateRoadmap(career.career)}
+                >
+                  Generate Roadmap
                 </Button>
               </CardContent>
             </Card>
@@ -207,6 +252,82 @@ export default function CareerDiscoverPage() {
             }}
           >
             Take Assessment Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Roadmap Display Screen
+  if (showRoadmap && roadmapData) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            {roadmapData.career_title || "Career"} Learning Roadmap
+          </h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Your personalized learning journey to become a {roadmapData.career_title || "professional"}
+          </p>
+        </div>
+
+        {/* Roadmap Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="text-center">
+            <CardContent className="p-6">
+              <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+              <p className="text-2xl font-bold text-primary">{roadmapData.total_duration || "6-12 months"}</p>
+              <p className="text-sm text-muted-foreground">Total Duration</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-6">
+              <Award className="h-8 w-8 mx-auto mb-2 text-purple-500" />
+              <p className="text-2xl font-bold text-primary capitalize">{roadmapData.difficulty_level || "Intermediate"}</p>
+              <p className="text-sm text-muted-foreground">Difficulty Level</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-6">
+              <Target className="h-8 w-8 mx-auto mb-2 text-green-500" />
+              <p className="text-2xl font-bold text-primary">{roadmapData.steps?.length || 8}</p>
+              <p className="text-sm text-muted-foreground">Learning Steps</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-4">
+          <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+            <Download className="mr-2 h-4 w-4" />
+            Download Roadmap
+          </Button>
+          <Button variant="outline">
+            <Share className="mr-2 h-4 w-4" />
+            Share Roadmap
+          </Button>
+        </div>
+
+        {/* Roadmap Timeline */}
+        {roadmapData.steps && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-center">Your Learning Path</h2>
+            <RoadmapTimeline steps={roadmapData.steps} />
+          </div>
+        )}
+
+        {/* Back Button */}
+        <div className="text-center">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowRoadmap(false)
+              setRoadmapData(null)
+              setShowResults(true)
+            }}
+            className="bg-transparent"
+          >
+            Back to Career Matches
           </Button>
         </div>
       </div>
