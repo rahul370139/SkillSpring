@@ -394,7 +394,7 @@ export default function CareerPage() {
               Back to Career Tools
             </Button>
           </div>
-        </div>        </div>
+        </div>
       </div>
     )
   }
