@@ -226,6 +226,32 @@ export default function LearnPage() {
       const chatUploadResp = await uploadFileForChat(supportedFiles[0], user?.id || "anonymous-user", conversationId, explanationLevel)
       console.log("Chat upload successful, response:", chatUploadResp)
 
+      // Step 3: Call /api/chat/ingest-distilled to load the lesson content into chat context
+      try {
+        const ingestResponse = await fetch(`${API}/api/chat/ingest-distilled`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: user?.id || "anonymous-user",
+            conversation_id: chatUploadResp.conversation_id,
+            lesson_id: distillResp.lesson_id,
+            explanation_level: explanationLevel,
+            framework: appliedFramework
+          }),
+        })
+        
+        if (ingestResponse.ok) {
+          const ingestData = await ingestResponse.json()
+          console.log("Lesson content ingested into chat:", ingestData)
+        } else {
+          console.warn("Failed to ingest lesson content:", await ingestResponse.text())
+        }
+      } catch (error) {
+        console.warn("Error ingesting lesson content:", error)
+      }
+
       // Store file locally and set contexts
       setUploadedFiles(prev => [...prev, supportedFiles[0]])
       setCurrentLessonId(distillResp.lesson_id)
@@ -550,15 +576,40 @@ export default function LearnPage() {
       type: "text"
     }
 
-          setMessages((prev: Message[]) => [...prev, userMessage])
+    setMessages((prev: Message[]) => [...prev, userMessage])
     setInputMessage("")
     setIsLoading(true)
 
     try {
+      // Get lesson content for chat context if available
+      let lessonContent = ""
+      if (currentLessonId && conversationId) {
+        try {
+          const lessonResponse = await fetch(`${API}/api/chat/lesson/${currentLessonId}/content`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          })
+          
+          if (lessonResponse.ok) {
+            const lessonData = await lessonResponse.json()
+            lessonContent = lessonData.content || ""
+            console.log("Lesson content loaded for chat:", lessonContent.substring(0, 200) + "...")
+          }
+        } catch (error) {
+          console.warn("Failed to load lesson content for chat:", error)
+        }
+      }
+
       // Build context from uploaded PDF and generated content
       let context = ""
       if (currentLessonId) {
         context += `\n\n📄 **Uploaded Document Context:** ${pdfContext}`
+      }
+      
+      if (lessonContent) {
+        context += `\n\n📚 **Lesson Content:**\n${lessonContent}`
       }
       
       // Add recent generated content to context
@@ -648,6 +699,32 @@ export default function LearnPage() {
       description: "All messages and context have been removed",
     })
   }
+
+  // Load existing conversations on component mount
+  useEffect(() => {
+    const loadConversations = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`${API}/api/chat/conversations/${user.id}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          })
+          
+          if (response.ok) {
+            const conversations = await response.json()
+            console.log("Loaded existing conversations:", conversations)
+            // You can use this to show conversation history in a sidebar
+          }
+        } catch (error) {
+          console.warn("Failed to load conversations:", error)
+        }
+      }
+    }
+
+    loadConversations()
+  }, [user?.id])
 
   return (
     <div className="container mx-auto px-4 py-6">
