@@ -834,7 +834,7 @@ export default function CareerPage() {
 
           {/* Right Sidebar */}
           <div className="space-y-6">
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-purple-50 blue-dark:from-blue-950/20 blue-dark:to-purple-950/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <HelpCircle className="h-5 w-5" />
