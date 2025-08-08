@@ -46,7 +46,7 @@ interface Message {
   actions?: string[]
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL!;
+const API = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
 
 /** POST /api/distill  – returns { lesson_id, actions[] } */
 async function uploadToDistill(file: File, ownerId: string) {
@@ -77,7 +77,7 @@ async function uploadToDistill(file: File, ownerId: string) {
     
     const result = await r.json()
     console.log("Upload success:", result)
-    return result as Promise<{ lesson_id: number; actions: string[] }>;
+    return result as { lesson_id: number; actions: string[] };
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -132,6 +132,8 @@ export default function LearnPage() {
     
     try {
       console.log("Starting file upload:", supportedFiles[0].name)
+      console.log("API URL:", API)
+      console.log("User ID:", user?.id || "anonymous-user")
       
       // NOTE: one-file upload for MVP
       const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "anonymous-user")
