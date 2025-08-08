@@ -27,3 +27,9 @@ tests/
 *.csv
 *.xlsx
 *.json
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.next/
+out/
