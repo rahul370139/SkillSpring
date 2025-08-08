@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Plus,
   X,
@@ -100,63 +99,75 @@ const skillSuggestions = [
   { name: "Python", category: "Technology", icon: Code },
   { name: "React", category: "Technology", icon: Code },
   { name: "Node.js", category: "Technology", icon: Code },
-  { name: "SQL", category: "Technology", icon: BarChart3 },
-  { name: "Machine Learning", category: "Technology", icon: Zap },
+  { name: "SQL", category: "Technology", icon: Code },
+  { name: "Git", category: "Technology", icon: Code },
   { name: "UI/UX Design", category: "Design", icon: Palette },
   { name: "Graphic Design", category: "Design", icon: Palette },
   { name: "Figma", category: "Design", icon: Palette },
   { name: "Adobe Creative Suite", category: "Design", icon: Palette },
-  { name: "Data Analysis", category: "Analytics", icon: BarChart3 },
-  { name: "Excel", category: "Analytics", icon: BarChart3 },
-  { name: "Tableau", category: "Analytics", icon: BarChart3 },
-  { name: "Google Analytics", category: "Analytics", icon: BarChart3 },
-  { name: "Project Management", category: "Management", icon: Target },
-  { name: "Leadership", category: "Management", icon: Users },
-  { name: "Communication", category: "Management", icon: Users },
-  { name: "Digital Marketing", category: "Marketing", icon: Globe },
-  { name: "SEO", category: "Marketing", icon: Globe },
-  { name: "Content Writing", category: "Marketing", icon: Globe },
+  { name: "Data Analysis", category: "Business", icon: BarChart3 },
+  { name: "Project Management", category: "Business", icon: Briefcase },
+  { name: "Marketing", category: "Business", icon: TrendingUp },
+  { name: "SEO", category: "Business", icon: TrendingUp },
+  { name: "Content Writing", category: "Business", icon: Globe },
+  { name: "Public Speaking", category: "Communication", icon: Users },
+  { name: "Leadership", category: "Communication", icon: Users },
+  { name: "Team Collaboration", category: "Communication", icon: Users },
 ]
 
 const interestSuggestions = [
-  { name: "Technology", icon: Code },
-  { name: "Design", icon: Palette },
-  { name: "Business", icon: Briefcase },
-  { name: "Data Science", icon: BarChart3 },
-  { name: "Artificial Intelligence", icon: Brain },
-  { name: "Marketing", icon: Globe },
-  { name: "Education", icon: Users },
-  { name: "Healthcare", icon: Heart },
-  { name: "Finance", icon: TrendingUp },
-  { name: "Creative Arts", icon: Music },
-  { name: "Photography", icon: Camera },
-  { name: "Engineering", icon: Wrench },
+  { name: "Technology", category: "Tech", icon: Code },
+  { name: "Design", category: "Creative", icon: Palette },
+  { name: "Business", category: "Professional", icon: Briefcase },
+  { name: "Data Science", category: "Tech", icon: BarChart3 },
+  { name: "Marketing", category: "Business", icon: TrendingUp },
+  { name: "Music", category: "Creative", icon: Music },
+  { name: "Photography", category: "Creative", icon: Camera },
+  { name: "Travel", category: "Lifestyle", icon: Globe },
+  { name: "Fitness", category: "Health", icon: Wrench },
+]
+
+const roleSuggestions = [
+  "Frontend Developer",
+  "Backend Developer",
+  "Full Stack Developer",
+  "Data Scientist",
+  "Product Manager",
+  "UI/UX Designer",
+  "DevOps Engineer",
+  "Mobile Developer",
+  "Data Analyst",
+  "Software Engineer",
+  "Project Manager",
+  "Marketing Manager",
+  "Content Creator",
+  "Business Analyst",
 ]
 
 const mockCareerResults = [
   {
     title: "Software Engineer",
-    match: 92,
-    description: "Design and develop software applications using various programming languages and frameworks.",
+    description: "Build and maintain software applications and systems",
+    salary: "$80,000 - $150,000",
+    match: 95,
+    skills: ["JavaScript", "Python", "React", "Node.js", "Git"],
     icon: Code,
-    skills: ["JavaScript", "Python", "React", "Node.js"],
-    salary: "$75,000 - $150,000",
   },
   {
-    title: "UX/UI Designer",
+    title: "Data Scientist",
+    description: "Analyze complex data to help organizations make better decisions",
+    salary: "$90,000 - $160,000",
     match: 88,
-    description: "Create intuitive and visually appealing user interfaces for digital products.",
-    icon: Palette,
-    skills: ["Figma", "Adobe Creative Suite", "User Research", "Prototyping"],
-    salary: "$60,000 - $120,000",
+    skills: ["Python", "SQL", "Machine Learning", "Statistics", "Data Analysis"],
+    icon: BarChart3,
   },
   {
-    title: "Data Analyst",
-    match: 85,
-    description: "Analyze complex data sets to help organizations make informed business decisions.",
-    icon: BarChart3,
-    skills: ["SQL", "Python", "Tableau", "Statistics"],
-    salary: "$55,000 - $100,000",
+    title: "Product Manager",
+    description: "Lead product development and strategy",
+    salary: "$85,000 - $140,000",
+    match: 82,
+    skills: ["Project Management", "Data Analysis", "Leadership", "Communication", "Strategy"],
+    icon: Briefcase,
   },
 ]
 
@@ -263,40 +274,26 @@ export default function CareerPage() {
       acc[skill.category].push(skill)
       return acc
     },
-    {} as Record<string, typeof skillSuggestions>,
+    {} as Record<string, typeof skillSuggestions>
   )
 
-  // Get available suggestions (not already selected)
   const getAvailableSkillSuggestions = () => {
-    return Object.entries(groupedSkills).reduce(
-      (acc, [category, skills]) => {
-        const availableSkills = skills.filter((skill) => !selectedSkills.includes(skill.name))
-        if (availableSkills.length > 0) {
-          acc[category] = availableSkills
-        }
-        return acc
-      },
-      {} as Record<string, typeof skillSuggestions>,
+    return skillSuggestions.filter(
+      (skill) => !selectedSkills.includes(skill.name)
     )
   }
 
   const getAvailableInterestSuggestions = () => {
-    return interestSuggestions.filter((interest) => !selectedInterests.includes(interest.name))
+    return interestSuggestions.filter(
+      (interest) => !selectedInterests.includes(interest.name)
+    )
   }
 
   const getAvailableRoleSuggestions = () => {
-    const popularRoles = [
-      "Software Engineer",
-      "Data Scientist",
-      "UX Designer",
-      "Product Manager",
-      "Digital Marketer",
-      "DevOps Engineer",
-    ]
-    return popularRoles.filter((role) => role !== targetRole)
+    return roleSuggestions
   }
 
-  // Assessment Loading Screen
+  // Loading Screen
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center">
@@ -334,67 +331,68 @@ export default function CareerPage() {
               </p>
             </div>
 
-          <div className="grid gap-6">
-            {mockCareerResults.map((career, index) => (
-              <div key={index} className="group hover:shadow-lg transition-all duration-300 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                      <career.icon className="h-6 w-6" />
+            <div className="grid gap-6">
+              {mockCareerResults.map((career, index) => (
+                <div key={index} className="group hover:shadow-lg transition-all duration-300 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                        <career.icon className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
+                          {career.title}
+                        </h3>
+                        <p className="text-sm text-blue-200">{career.description}</p>
+                        <p className="text-sm font-medium text-green-400">{career.salary}</p>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
-                        {career.title}
-                      </h3>
-                      <p className="text-sm text-blue-200">{career.description}</p>
-                      <p className="text-sm font-medium text-green-400">{career.salary}</p>
+                    <div className="text-right">
+                      <Badge
+                        variant="secondary"
+                        className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                      >
+                        {career.match}%
+                      </Badge>
+                      <p className="text-xs text-blue-300 mt-1">Match</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge
-                      variant="secondary"
-                      className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white"
-                    >
-                      {career.match}%
-                    </Badge>
-                    <p className="text-xs text-blue-300 mt-1">Match</p>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium mb-2 text-blue-200">Key Skills:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {career.skills.map((skill, skillIndex) => (
+                          <Badge key={skillIndex} variant="outline" className="text-xs bg-blue-600/20 border-blue-400/30 text-blue-200">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                      Generate Learning Roadmap
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2 text-blue-200">Key Skills:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {career.skills.map((skill, skillIndex) => (
-                        <Badge key={skillIndex} variant="outline" className="text-xs bg-blue-600/20 border-blue-400/30 text-blue-200">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-                    Generate Learning Roadmap
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="text-center space-y-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowResults(false)
-                setShowAssessment(false)
-                setCurrentStep(0)
-                setAnswers({})
-              }}
-              className="mr-4 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
-            >
-              Back to Career Tools
-            </Button>
+            <div className="text-center space-y-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowResults(false)
+                  setShowAssessment(false)
+                  setCurrentStep(0)
+                  setAnswers({})
+                }}
+                className="mr-4 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
+              >
+                Back to Career Tools
+              </Button>
+            </div>
           </div>
-        </div>        </div>
+        </div>
       </div>
     )
   }
@@ -419,49 +417,50 @@ export default function CareerPage() {
               <Progress value={progress} className="w-full bg-slate-700" />
             </div>
 
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-8">
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-white">Question {currentStep + 1}</h2>
-              <p className="text-lg leading-relaxed text-blue-100">{currentQuestion.question}</p>
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl p-8">
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-white">Question {currentStep + 1}</h2>
+                <p className="text-lg leading-relaxed text-blue-100">{currentQuestion.question}</p>
 
-              <RadioGroup
-                value={answers[currentQuestion.id] || ""}
-                onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                className="space-y-3"
-              >
-                {likertOptions.map((option) => (
-                  <div
-                    key={option.value}
-                    className="flex items-center space-x-3 p-4 rounded-lg hover:bg-slate-700/50 transition-colors border border-slate-600/30"
-                  >
-                    <RadioGroupItem value={option.value} id={option.value} className="text-blue-500" />
-                    <Label htmlFor={option.value} className="flex-1 cursor-pointer text-sm text-blue-100">
-                      {option.label}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+                <RadioGroup
+                  value={answers[currentQuestion.id] || ""}
+                  onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
+                  className="space-y-3"
+                >
+                  {likertOptions.map((option) => (
+                    <div
+                      key={option.value}
+                      className="flex items-center space-x-3 p-4 rounded-lg hover:bg-slate-700/50 transition-colors border border-slate-600/30"
+                    >
+                      <RadioGroupItem value={option.value} id={option.value} className="text-blue-500" />
+                      <Label htmlFor={option.value} className="flex-1 cursor-pointer text-sm text-blue-100">
+                        {option.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="flex items-center gap-2 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!canGoNext}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-            >
-              {currentStep === assessmentQuestions.length - 1 ? "Get Results" : "Next"}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 0}
+                className="flex items-center gap-2 bg-slate-800/50 border-slate-600 text-blue-200 hover:bg-slate-700/50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={!canGoNext}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+              >
+                {currentStep === assessmentQuestions.length - 1 ? "Get Results" : "Next"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -637,4 +636,15 @@ export default function CareerPage() {
                         >
                           <X className="h-3 w-3" />
                         </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
