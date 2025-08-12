@@ -107,6 +107,116 @@ export default function LearnPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const footerFileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
+  // Normalize and render structured chat responses (flashcards/quiz/workflow/lesson/summary)
+  const processChatResponse = (data: any, fallbackText?: string) => {
+    // Flashcards mapping
+    const flashcards = data?.flashcards || data?.flashcard_data?.cards || data?.flashcardData || null
+    if (flashcards && Array.isArray(flashcards)) {
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "flashcards",
+          flashcardData: flashcards,
+        },
+      ])
+      return
+    }
+
+    // Quiz mapping
+    const quizQs = data?.quiz || data?.quiz_data?.questions || data?.quizData || null
+    if (quizQs && Array.isArray(quizQs)) {
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "quiz",
+          quizData: quizQs,
+        },
+      ])
+      return
+    }
+
+    // Workflow mapping (array of steps or mermaid code)
+    const workflowSteps = Array.isArray(data?.workflow)
+      ? data.workflow
+      : Array.isArray(data?.workflow_data?.steps)
+        ? data.workflow_data.steps
+        : Array.isArray(data?.workflowData)
+          ? data.workflowData
+          : null
+    if (workflowSteps) {
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "workflow",
+          content: workflowSteps.join("\n\n"),
+          workflowData: workflowSteps,
+        },
+      ])
+      return
+    }
+
+    // Lesson mapping (summary + bullets)
+    const lessonData = data?.lesson || data?.lesson_data || data?.lessonData
+    if (lessonData?.bullets || lessonData?.summary) {
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "lesson",
+          lessonData: {
+            lesson_id: String(lessonData?.lesson_id || currentLessonId || ""),
+            bullets: lessonData?.bullets || [],
+            framework: lessonData?.framework || appliedFramework,
+            explanation_level: lessonData?.explanation_level || appliedExperienceLevel,
+          },
+        },
+      ])
+      return
+    }
+
+    // Summary mapping (array of bullet strings)
+    const summaryBullets = data?.summary || data?.summary_data || data?.summaryData
+    if (Array.isArray(summaryBullets)) {
+      const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "summary",
+          content: md,
+          summaryData: summaryBullets,
+        },
+      ])
+      return
+    }
+
+    // Fallback to plain text
+    const text = data?.response || fallbackText || ""
+    if (text) {
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: text,
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ])
+    }
+  }
 
   useEffect(() => {
     scrollToBottom()
@@ -255,210 +365,34 @@ export default function LearnPage() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Implement handleActionClick
+  // Implement handleActionClick using chat endpoint (no separate learn endpoints)
   const handleActionClick = async (action: string, lessonId: number) => {
     console.log("handleActionClick called with:", { action, lessonId })
     setIsLoading(true)
-    
     try {
-      console.log("Making API call to get lesson content")
-      
-      const data = await learnAPI.getLessonContent(lessonId.toString(), action)
-      console.log("API response:", data)
-      console.log("API response type:", typeof data)
-      console.log("API response keys:", Object.keys(data))
-      
-      let content = ""
-      if (typeof data === 'string') {
-        content = data
-      } else if (data.content) {
-        // Handle nested content structure
-        if (typeof data.content === 'string') {
-          content = data.content
-        } else if (Array.isArray(data.content)) {
-          // Handle array content (like summary bullets)
-          content = data.content.join('\n\n')
-        } else if (data.content.cards) {
-          // Handle flashcards format
-          content = data.content.cards.map((card: any, index: number) => 
-            `**Card ${index + 1}:**\n${card.question || card.front || 'Question'}\n\n**Answer:** ${card.answer || card.back || 'Answer'}`
-          ).join('\n\n')
-        } else if (data.content.workflow) {
-          // Handle workflow format
-          content = data.content.workflow.join('\n\n')
-        } else if (data.content.title && data.content.summary) {
-          // Handle lesson format
-          content = `# ${data.content.title}\n\n${data.content.summary}\n\n## Key Points:\n${data.content.bullets?.join('\n') || ''}`
-        } else {
-          content = JSON.stringify(data.content, null, 2)
-        }
-      } else if (data.response) {
-        content = data.response
-      } else {
-        content = `Generated ${action} for your document.`
-      }
-      
-      console.log("Final content to display:", content)
-      
-      // Handle different action types with proper rendering
-      if (action === "lesson") {
-        // Use LessonDisplay component for complete lesson (summary only)
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "lesson",
-            lessonData: {
-              lesson_id: lessonId.toString(),
-              bullets: data.content.bullets || [],
-              framework: appliedFramework,
-              explanation_level: appliedExperienceLevel,
-            }
-          }
-        ])
-      } else if (action === "summary") {
-        // Use Markdown for bullets
-        const bullets = Array.isArray(data.content) ? data.content : []
-        const md = bullets.map((pt: string) => `- **${pt}**`).join("\n")
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "summary",
-            content: md,
-            summaryData: bullets,
-          }
-        ])
-        
-        // Send to chat context
-        if (conversationId) {
-          try {
-            await chatAPI.sendMessage({
-              message: `Here is the summary: ${bullets.join("; ")}`,
-              user_id: user?.id || "anonymous-user",
-              conversation_id: conversationId,
-              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-              framework: appliedFramework,
-              lesson_id: lessonId,
-            })
-            console.log("Summary sent to chat context")
-          } catch (error) {
-            console.error("Failed to send summary to chat:", error)
-          }
-        }
-      } else if (action === "flashcards") {
-        // Handle flashcards with flip animation
-        const flashcards = data.content.cards || []
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "flashcards",
-            flashcardData: flashcards,
-          }
-        ])
-        
-        // Send to chat context
-        if (conversationId) {
-          try {
-            await chatAPI.sendMessage({
-              message: `Here are the flashcards: ${flashcards.map((card: any) => `${card.question} - ${card.answer}`).join("; ")}`,
-              user_id: user?.id || "anonymous-user",
-              conversation_id: conversationId,
-              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-              framework: appliedFramework,
-              lesson_id: lessonId,
-            })
-            console.log("Flashcards sent to chat context")
-          } catch (error) {
-            console.error("Failed to send flashcards to chat:", error)
-          }
-        }
-      } else if (action === "quiz") {
-        // Handle quiz with interactive questions
-        const quizItems = data.content.questions || []
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "quiz",
-            quizData: quizItems,
-          }
-        ])
-        
-        // Send to chat context
-        if (conversationId) {
-          try {
-            await chatAPI.sendMessage({
-              message: `Here is the quiz: ${quizItems.map((item: any) => item.question).join("; ")}`,
-              user_id: user?.id || "anonymous-user",
-              conversation_id: conversationId,
-              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-              framework: appliedFramework,
-              lesson_id: lessonId,
-            })
-            console.log("Quiz sent to chat context")
-          } catch (error) {
-            console.error("Failed to send quiz to chat:", error)
-          }
-        }
-      } else if (action === "workflow") {
-        // Handle workflow steps
-        const workflowSteps = Array.isArray(data.content) ? data.content : data.content.workflow || []
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "workflow",
-            content: workflowSteps.join("\n\n"),
-            workflowData: workflowSteps,
-          }
-        ])
-        
-        // Send to chat context
-        if (conversationId) {
-          try {
-            await chatAPI.sendMessage({
-              message: `Here is the workflow: ${workflowSteps.join("; ")}`,
-              user_id: user?.id || "anonymous-user",
-              conversation_id: conversationId,
-              explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
-              framework: appliedFramework,
-              lesson_id: lessonId,
-            })
-            console.log("Workflow sent to chat context")
-          } catch (error) {
-            console.error("Failed to send workflow to chat:", error)
-          }
-        }
-      }
-      
-      console.log("Message added successfully")
+      const prompt = `create ${action}`
+      const data = await chatAPI.sendMessage({
+        message: prompt,
+        user_id: user?.id || "anonymous-user",
+        conversation_id: conversationId || undefined,
+        explanation_level:
+          appliedExperienceLevel === "beginner"
+            ? "5_year_old"
+            : appliedExperienceLevel === "intermediate"
+              ? "intern"
+              : appliedExperienceLevel === "expert"
+                ? "senior"
+                : "senior",
+        framework: appliedFramework,
+        lesson_id: lessonId,
+      })
+      processChatResponse(data, data?.response)
+      console.log("Action handled via chat response")
     } catch (error) {
-      console.error(`Failed to generate ${action}:`, error)
-      let errorMessage = `Failed to generate ${action}. Please try again.`
-      if (error instanceof Error) {
-        if (error.message.includes("404")) {
-          errorMessage = `The ${action} feature is not available for this document.`
-        } else if (error.message.includes("500")) {
-          errorMessage = `Server error while generating ${action}. Please try again later.`
-        } else {
-          errorMessage = error.message
-        }
-      }
+      console.error(`Failed to generate ${action} via chat:`, error)
       toast({
         title: "Generation Failed",
-        description: errorMessage,
+        description: `Failed to generate ${action}. Please try again.`,
         variant: "destructive",
       })
     } finally {
@@ -523,15 +457,7 @@ export default function LearnPage() {
         lesson_id: currentLessonId,
         context: context
       })
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: data.response || "I'm here to help you learn! Ask me anything about your uploaded materials.",
-        sender: "ai",
-        timestamp: new Date(),
-      }
-
-      setMessages((prev: Message[]) => [...prev, aiMessage])
+      processChatResponse(data, data?.response)
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
