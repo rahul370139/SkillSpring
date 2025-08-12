@@ -7,7 +7,10 @@ export default function Login() {
   const [sent, setSent] = useState(false);
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin } });
+    await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+    });
     setSent(true);
   };
 

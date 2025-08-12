@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase"
 
 interface User {
   id: string
@@ -13,8 +14,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  loginWithMagicLink: (email: string) => Promise<void>
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -33,54 +34,76 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Simulate checking for existing session
-    const checkAuth = async () => {
+    const init = async () => {
       try {
-        // In a real app, you'd check for a valid token/session here
-        const savedUser = localStorage.getItem("trainpi_user")
-        if (savedUser) {
-          setUser(JSON.parse(savedUser))
+        const { data } = await supabase.auth.getSession()
+        const session = data.session
+        if (session?.user) {
+          const sUser = session.user
+          setUser({
+            id: sUser.id,
+            name: (sUser.user_metadata?.full_name as string) || (sUser.email?.split("@")[0] as string) || "User",
+            email: sUser.email || "",
+            avatar: (sUser.user_metadata?.avatar_url as string) || undefined,
+          })
+        } else {
+          setUser(null)
         }
       } catch (error) {
-        console.error("Auth check failed:", error)
+        console.error("Auth init failed:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAuth()
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const sUser = session.user
+        setUser({
+          id: sUser.id,
+          name: (sUser.user_metadata?.full_name as string) || (sUser.email?.split("@")[0] as string) || "User",
+          email: sUser.email || "",
+          avatar: (sUser.user_metadata?.avatar_url as string) || undefined,
+        })
+      } else {
+        setUser(null)
+      }
+    })
+
+    init()
+    return () => {
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
-  const login = async (email: string, password: string) => {
+  const loginWithMagicLink = async (email: string) => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const mockUser: User = {
-        id: "1",
-        name: "John Doe",
-        email: email,
-        avatar: "/placeholder-user.jpg",
-      }
-
-      setUser(mockUser)
-      localStorage.setItem("trainpi_user", JSON.stringify(mockUser))
+      await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      })
     } catch (error) {
-      throw new Error("Login failed")
+      console.error("Login with magic link failed:", error)
+      throw error
     } finally {
       setIsLoading(false)
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("trainpi_user")
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      setUser(null)
+    }
   }
 
   const value = {
     user,
-    login,
+    loginWithMagicLink,
     logout,
     isLoading,
   }

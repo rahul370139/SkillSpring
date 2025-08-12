@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import { useAuth } from "@/components/auth-provider"
 import { chatAPI } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,7 @@ export function ChatInterface({ files, selectedLevel, selectedFramework }: ChatI
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
 
   // Update uploaded files when files prop changes
   useEffect(() => {
@@ -71,7 +73,7 @@ export function ChatInterface({ files, selectedLevel, selectedFramework }: ChatI
     try {
       const data = await chatAPI.sendMessage({
         message: inputMessage,
-        user_id: "user-123",
+        user_id: user?.id || "anonymous-user",
         explanation_level: selectedLevel === "beginner" ? "5_year_old" : selectedLevel === "intermediate" ? "intern" : "senior"
       })
 

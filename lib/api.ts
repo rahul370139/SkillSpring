@@ -223,9 +223,11 @@ export const chatAPI = {
     const formData = new FormData();
     formData.append("file", file);
     if (conversationId) formData.append("conversation_id", conversationId);
-    if (explanationLevel) formData.append("explanation_level", explanationLevel);
+    // per backend spec, explanation_level should be sent in the query, not as form field
 
-    return fetch(`${API_BASE_URL}/api/chat/upload?user_id=${encodeURIComponent(userId)}`, {
+    const url = `${API_BASE_URL}/api/chat/upload?user_id=${encodeURIComponent(userId)}${explanationLevel ? `&explanation_level=${encodeURIComponent(explanationLevel)}` : ""}`;
+
+    return fetch(url, {
       method: "POST",
       body: formData,
     }).then(res => {

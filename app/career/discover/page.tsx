@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { CareerStepper } from "@/components/career-stepper"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useSession } from "@supabase/auth-helpers-react"
+import { useAuth } from "@/components/auth-provider"
 import { RoadmapTimeline } from "@/components/roadmap-timeline"
 import { Download, Share, Clock, Award, Target } from "lucide-react"
 
@@ -87,7 +87,7 @@ export default function CareerDiscoverPage() {
   const [showResults, setShowResults] = useState(false)
   const [roadmapData, setRoadmapData] = useState<any>(null)
   const [showRoadmap, setShowRoadmap] = useState(false)
-  const session = useSession()
+  const { user } = useAuth()
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
@@ -95,7 +95,7 @@ export default function CareerDiscoverPage() {
 
   const handleNext = async () => {
     if (currentStep === questions.length) {
-      if (!session?.user.id) {
+      if (!user?.id) {
         alert("Please sign in to get your career matches")
         return
       }
@@ -104,7 +104,7 @@ export default function CareerDiscoverPage() {
       setIsLoading(true)
       try {
         const data = await careerAPI.matchCareer({
-          user_id: session.user.id,
+          user_id: user.id,
           answers: Object.entries(answers).map(([question_id, rating]) => ({
             question_id: Number.parseInt(question_id),
             rating: Number.parseInt(rating),
@@ -145,7 +145,7 @@ export default function CareerDiscoverPage() {
           target_role: careerTitle,
           interests: ["technology", "problem-solving"], // Default interests from quiz
           skills: [], // Will be determined by the backend based on career
-          user_id: session?.user?.id || "user-123",
+          user_id: user?.id || "anonymous-user",
         }),
       })
 

@@ -36,6 +36,7 @@ import {
   Clock,
   Award,
 } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 // Assessment Questions
 const assessmentQuestions = [
@@ -171,6 +172,7 @@ export default function CareerPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [showResults, setShowResults] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const { user } = useAuth()
 
   // Roadmap Generator State
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
@@ -195,7 +197,7 @@ export default function CareerPage() {
         
         const result = await careerAPI.matchCareer({
           answers: answersArray,
-          owner_id: "user-123",
+          owner_id: user?.id || "anonymous-user",
           user_profile: {
             experience_level: "beginner",
             interests: ["technology", "problem-solving"]
@@ -267,7 +269,7 @@ export default function CareerPage() {
           target_role: targetRole,
           interests: selectedInterests,
           skills: selectedSkills,
-          user_id: "user-123", // Replace with actual user ID when auth is implemented
+          user_id: user?.id || "anonymous-user",
         }),
       })
 
@@ -300,7 +302,7 @@ export default function CareerPage() {
           target_role: careerTitle,
           interests: ["technology", "problem-solving"], // Default interests from quiz
           skills: [], // Will be determined by the backend based on career
-          user_id: "user-123", // Replace with actual user ID when auth is implemented
+          user_id: user?.id || "anonymous-user",
         }),
       })
 
