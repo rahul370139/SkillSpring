@@ -44,14 +44,17 @@ interface Message {
   timestamp: Date
   files?: File[]
   type?: "text" | "file" | "actions" | "lesson" | "summary" | "flashcards" | "quiz" | "workflow"
+  // NEW fields for messages of type="actions":
   lesson_id?: number
   actions?: string[]
+  // NEW fields for messages of type="lesson":
   lessonData?: {
     lesson_id: string
     bullets: string[]
     framework: string
     explanation_level: string
   }
+  // NEW fields for individual action types:
   summaryData?: string[]
   flashcardData?: Array<{ front: string; back: string }>
   quizData?: Array<{ question: string; options: string[]; answer: string }>
@@ -105,6 +108,7 @@ export default function LearnPage() {
   const [currentLessonId, setCurrentLessonId] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [pdfContext, setPdfContext] = useState<string>("")
+  const [buttonsEnabled, setButtonsEnabled] = useState(false) // Don't enable buttons until upload completes
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const footerFileInputRef = useRef<HTMLInputElement>(null)
@@ -138,331 +142,171 @@ export default function LearnPage() {
     }
   }, [user?.id])
 
-  // COMPLETELY REWRITTEN processChatResponse function with comprehensive parsing
+  // Fixed processChatResponse with proper data mapping
   const processChatResponse = (data: any, fallbackText?: string): boolean => {
-    console.log("🔍 RAW API RESPONSE:", JSON.stringify(data, null, 2))
+    console.log("🔍 Processing chat response:", JSON.stringify(data, null, 2))
 
-    // Try to extract the actual response data from various possible structures
-    let responseData = data
-    let responseText = ""
+    const payload = data?.data ?? data
+    const type = payload?.type
+    const responseText = payload?.response || fallbackText || ""
 
-    // Handle different response structures
-    if (data?.data) {
-      responseData = data.data
-    }
-    if (data?.response) {
-      responseText = data.response
-    }
-    if (data?.message) {
-      responseText = data.message
-    }
-    if (fallbackText) {
-      responseText = fallbackText
-    }
+    console.log("📊 Extracted payload:", payload)
+    console.log("🏷️ Type detected:", type)
 
-    console.log("📊 Processed responseData:", responseData)
-    console.log("📄 Response text:", responseText)
+    // Quiz mapping - check all possible locations
+    const quizData = payload?.quiz || payload?.quiz_data?.questions || payload?.content?.questions || null
+    if (quizData && Array.isArray(quizData) && quizData.length > 0) {
+      console.log("🧩 Quiz data found:", quizData)
 
-    // Function to recursively search for data in nested objects
-    const findDataInObject = (obj: any, keys: string[]): any => {
-      if (!obj || typeof obj !== "object") return null
-
-      for (const key of keys) {
-        if (obj[key]) {
-          console.log(`✅ Found data at key: ${key}`, obj[key])
-          return obj[key]
-        }
-      }
-
-      // Search nested objects
-      for (const [key, value] of Object.entries(obj)) {
-        if (typeof value === "object" && value !== null) {
-          const found = findDataInObject(value, keys)
-          if (found) return found
-        }
-      }
-
-      return null
-    }
-
-    // Try to parse JSON from response text if it contains JSON
-    let parsedFromText = null
-    if (responseText && typeof responseText === "string") {
-      // Look for JSON blocks
-      const jsonMatches = [
-        responseText.match(/```json\s*([\s\S]*?)\s*```/),
-        responseText.match(/\{[\s\S]*\}/),
-        responseText.match(/\[[\s\S]*\]/),
-      ]
-
-      for (const match of jsonMatches) {
-        if (match) {
-          try {
-            parsedFromText = JSON.parse(match[1] || match[0])
-            console.log("🔍 Parsed JSON from text:", parsedFromText)
-            break
-          } catch (e) {
-            console.log("❌ Failed to parse JSON:", e)
-          }
-        }
-      }
-    }
-
-    // QUIZ PROCESSING - Check all possible locations
-    const quizSources = [
-      responseData?.quiz,
-      responseData?.quiz_data?.questions,
-      responseData?.questions,
-      responseData?.content?.questions,
-      responseData?.data?.quiz,
-      responseData?.data?.questions,
-      parsedFromText?.quiz,
-      parsedFromText?.questions,
-      parsedFromText?.quiz_data?.questions,
-      // Check if the entire response is a quiz array
-      Array.isArray(responseData) ? responseData : null,
-      Array.isArray(parsedFromText) ? parsedFromText : null,
-    ]
-
-    for (const quizData of quizSources) {
-      if (quizData && Array.isArray(quizData) && quizData.length > 0) {
-        console.log("🧩 Found quiz data:", quizData)
-
-        // Normalize quiz format
-        const normalizedQuiz = quizData.map((item: any, index: number) => {
-          if (typeof item === "string") {
-            return {
-              question: item,
-              options: [`Option A`, `Option B`, `Option C`, `Option D`],
-              answer: "A",
-            }
-          }
-
+      // Normalize quiz format
+      const normalizedQuiz = quizData.map((item: any, index: number) => {
+        if (typeof item === "string") {
           return {
-            question: item?.question || item?.q || item?.text || `Question ${index + 1}`,
-            options: item?.options ||
-              item?.choices ||
-              item?.answers || [`Option A`, `Option B`, `Option C`, `Option D`],
-            answer: item?.answer || item?.correct || item?.correctAnswer || "A",
+            question: item,
+            options: [`Option A`, `Option B`, `Option C`, `Option D`],
+            answer: "A",
           }
-        })
-
-        if (normalizedQuiz.length > 0) {
-          const preview = normalizedQuiz.map((q: any, idx: number) => `${idx + 1}. ${q.question}`).join("\n")
-
-          setMessages((prev: Message[]) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              sender: "ai",
-              timestamp: new Date(),
-              type: "quiz",
-              quizData: normalizedQuiz,
-              content: preview,
-            },
-          ])
-          return true
         }
-      }
+        return {
+          question: item?.question || item?.q || item?.text || `Question ${index + 1}`,
+          options: item?.options || item?.choices || item?.answers || [`Option A`, `Option B`, `Option C`, `Option D`],
+          answer: item?.answer || item?.correct || item?.correctAnswer || "A",
+        }
+      })
+
+      const preview = normalizedQuiz.map((q: any, idx: number) => `${idx + 1}. ${q.question}`).join("\n")
+
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "quiz",
+          quizData: normalizedQuiz,
+          content: preview,
+        },
+      ])
+      return true
     }
 
-    // FLASHCARDS PROCESSING - Check all possible locations
-    const flashcardSources = [
-      responseData?.flashcards,
-      responseData?.flashcard_data?.cards,
-      responseData?.cards,
-      responseData?.content?.cards,
-      responseData?.data?.flashcards,
-      responseData?.data?.cards,
-      parsedFromText?.flashcards,
-      parsedFromText?.cards,
-      parsedFromText?.flashcard_data?.cards,
-      // Check if the entire response is a flashcards array
-      Array.isArray(responseData) ? responseData : null,
-      Array.isArray(parsedFromText) ? parsedFromText : null,
-    ]
+    // Flashcards mapping - check all possible locations
+    const flashcardData = payload?.flashcards || payload?.flashcard_data?.cards || payload?.content?.cards || null
+    if (flashcardData && Array.isArray(flashcardData) && flashcardData.length > 0) {
+      console.log("🃏 Flashcard data found:", flashcardData)
 
-    for (const flashcardData of flashcardSources) {
-      if (flashcardData && Array.isArray(flashcardData) && flashcardData.length > 0) {
-        console.log("🃏 Found flashcard data:", flashcardData)
-
-        // Normalize flashcard format
-        const normalizedFlashcards = flashcardData.map((item: any, index: number) => {
-          if (typeof item === "string") {
-            return {
-              front: item,
-              back: `Answer ${index + 1}`,
-            }
-          }
-
+      // Normalize flashcard format
+      const normalizedFlashcards = flashcardData.map((item: any, index: number) => {
+        if (typeof item === "string") {
           return {
-            front: item?.front || item?.question || item?.term || item?.q || `Question ${index + 1}`,
-            back: item?.back || item?.answer || item?.definition || item?.a || `Answer ${index + 1}`,
+            front: item,
+            back: `Answer ${index + 1}`,
           }
-        })
-
-        if (normalizedFlashcards.length > 0) {
-          const preview = normalizedFlashcards
-            .map((c: any, idx: number) => `• ${idx + 1}. ${c.front} → ${c.back}`)
-            .join("\n")
-
-          setMessages((prev: Message[]) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              sender: "ai",
-              timestamp: new Date(),
-              type: "flashcards",
-              flashcardData: normalizedFlashcards,
-              content: preview,
-            },
-          ])
-          return true
         }
-      }
-    }
-
-    // WORKFLOW PROCESSING - Check all possible locations
-    const workflowSources = [
-      responseData?.workflow,
-      responseData?.workflow_data?.steps,
-      responseData?.steps,
-      responseData?.content?.workflow,
-      responseData?.content?.steps,
-      responseData?.data?.workflow,
-      responseData?.data?.steps,
-      parsedFromText?.workflow,
-      parsedFromText?.steps,
-      parsedFromText?.workflow_data?.steps,
-      // Check if the entire response is a workflow array
-      Array.isArray(responseData) ? responseData : null,
-      Array.isArray(parsedFromText) ? parsedFromText : null,
-    ]
-
-    for (const workflowData of workflowSources) {
-      if (workflowData && Array.isArray(workflowData) && workflowData.length > 0) {
-        console.log("🔄 Found workflow data:", workflowData)
-
-        // Normalize workflow format
-        const normalizedWorkflow = workflowData.map((item: any, index: number) => {
-          if (typeof item === "string") {
-            return item
-          }
-          return item?.step || item?.description || item?.text || `Step ${index + 1}`
-        })
-
-        if (normalizedWorkflow.length > 0) {
-          setMessages((prev: Message[]) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              sender: "ai",
-              timestamp: new Date(),
-              type: "workflow",
-              content: normalizedWorkflow.join("\n\n"),
-              workflowData: normalizedWorkflow,
-            },
-          ])
-          return true
+        return {
+          front: item?.front || item?.question || item?.term || item?.q || `Question ${index + 1}`,
+          back: item?.back || item?.answer || item?.definition || item?.a || `Answer ${index + 1}`,
         }
-      }
+      })
+
+      const preview = normalizedFlashcards
+        .map((c: any, idx: number) => `• ${idx + 1}. ${c.front} → ${c.back}`)
+        .join("\n")
+
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "flashcards",
+          flashcardData: normalizedFlashcards,
+          content: preview,
+        },
+      ])
+      return true
     }
 
-    // Check for mermaid workflow
-    const mermaidSources = [
-      responseData?.workflow_data?.mermaid_code,
-      responseData?.mermaid,
-      responseData?.mermaid_code,
-      parsedFromText?.workflow_data?.mermaid_code,
-      parsedFromText?.mermaid,
-      parsedFromText?.mermaid_code,
-    ]
+    // Workflow mapping - check all possible locations
+    const workflowSteps = payload?.workflow_data?.steps || payload?.workflow || payload?.content?.workflow || null
+    const mermaidCode = payload?.workflow_data?.mermaid_code || null
 
-    for (const mermaidCode of mermaidSources) {
-      if (typeof mermaidCode === "string" && mermaidCode.trim().length > 0) {
-        console.log("📊 Found mermaid code:", mermaidCode)
-        const md = ["```mermaid", mermaidCode.trim(), "```"].join("\n")
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "workflow",
-            content: md,
+    if (workflowSteps && Array.isArray(workflowSteps) && workflowSteps.length > 0) {
+      console.log("🔄 Workflow steps found:", workflowSteps)
+
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "workflow",
+          content: workflowSteps.join("\n\n"),
+          workflowData: workflowSteps,
+        },
+      ])
+      return true
+    }
+
+    if (typeof mermaidCode === "string" && mermaidCode.trim().length > 0) {
+      console.log("📊 Mermaid code found:", mermaidCode)
+      const md = ["```mermaid", mermaidCode.trim(), "```"].join("\n")
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "workflow",
+          content: md,
+        },
+      ])
+      return true
+    }
+
+    // Summary mapping - check all possible locations
+    const summaryData = payload?.summary_data?.key_points || payload?.summary || payload?.summary_data || null
+    if (Array.isArray(summaryData) && summaryData.length > 0) {
+      console.log("📝 Summary data found:", summaryData)
+      const md = summaryData.map((pt: string) => `- **${pt}**`).join("\n")
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "summary",
+          content: md,
+          summaryData: summaryData,
+        },
+      ])
+      return true
+    }
+
+    // Lesson mapping
+    const lessonData = payload?.lesson_data || payload?.lesson || payload?.content || null
+    if (lessonData && (lessonData.bullets || lessonData.summary)) {
+      console.log("📚 Lesson data found:", lessonData)
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "lesson",
+          lessonData: {
+            lesson_id: String(lessonData?.lesson_id || currentLessonId || ""),
+            bullets: lessonData?.bullets || [],
+            framework: lessonData?.framework || appliedFramework,
+            explanation_level: lessonData?.explanation_level || appliedExperienceLevel,
           },
-        ])
-        return true
-      }
+        },
+      ])
+      return true
     }
 
-    // LESSON PROCESSING - Check all possible locations
-    const lessonSources = [
-      responseData?.lesson,
-      responseData?.lesson_data,
-      responseData?.content,
-      responseData?.data?.lesson,
-      parsedFromText?.lesson,
-      parsedFromText?.lesson_data,
-      parsedFromText?.content,
-    ]
-
-    for (const lessonData of lessonSources) {
-      if (lessonData && (lessonData.bullets || lessonData.summary)) {
-        console.log("📚 Found lesson data:", lessonData)
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "lesson",
-            lessonData: {
-              lesson_id: String(lessonData?.lesson_id || currentLessonId || ""),
-              bullets: lessonData?.bullets || [],
-              framework: lessonData?.framework || appliedFramework,
-              explanation_level: lessonData?.explanation_level || appliedExperienceLevel,
-            },
-          },
-        ])
-        return true
-      }
-    }
-
-    // SUMMARY PROCESSING - Check all possible locations
-    const summarySources = [
-      responseData?.summary_data?.key_points,
-      responseData?.summary,
-      responseData?.summary_data,
-      responseData?.content,
-      responseData?.data?.summary,
-      parsedFromText?.summary_data?.key_points,
-      parsedFromText?.summary,
-      parsedFromText?.summary_data,
-      parsedFromText?.content,
-    ]
-
-    for (const summaryData of summarySources) {
-      if (Array.isArray(summaryData) && summaryData.length > 0) {
-        console.log("📝 Found summary data:", summaryData)
-        const md = summaryData.map((pt: string) => `- **${pt}**`).join("\n")
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "summary",
-            content: md,
-            summaryData: summaryData,
-          },
-        ])
-        return true
-      }
-    }
-
-    // Fallback to plain text if we have response text
-    if (responseText && responseText.trim().length > 0) {
+    // Fallback to plain text
+    if (responseText) {
       console.log("📝 Using fallback text response")
       setMessages((prev: Message[]) => [
         ...prev,
@@ -522,6 +366,7 @@ export default function LearnPage() {
     }
 
     setIsUploading(true)
+    setButtonsEnabled(false) // Disable buttons during upload
 
     try {
       console.log("Starting file upload:", supportedFiles[0].name)
@@ -576,7 +421,21 @@ export default function LearnPage() {
       } catch {}
       setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
-      // Add the AI's response from chat upload (no quick action buttons)
+      // IMPORTANT: Enable buttons only after upload completes and conversation_id is set
+      setButtonsEnabled(true)
+
+      // Optional: Hydrate lesson content for better context
+      try {
+        const lessonContent = await learnAPI.getLessonContentForChat(
+          distillResp.lesson_id.toString(),
+          user?.id || "anonymous-user",
+        )
+        console.log("Lesson content hydrated:", lessonContent)
+      } catch (error) {
+        console.warn("Failed to hydrate lesson content:", error)
+      }
+
+      // Add the AI's response from chat upload
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -587,7 +446,7 @@ export default function LearnPage() {
         },
         {
           id: (Date.now() + 1).toString(),
-          content: `✅ ${supportedFiles[0].name} uploaded and processed. Try the quick action buttons below!`,
+          content: `✅ ${supportedFiles[0].name} uploaded and processed. You can now use the quick action buttons or ask specific questions!`,
           sender: "ai",
           timestamp: new Date(),
           type: "text",
@@ -596,7 +455,7 @@ export default function LearnPage() {
 
       toast({
         title: "File Processed Successfully",
-        description: `${supportedFiles[0].name} uploaded and integrated into chat. You can now generate summaries, quizzes, and more!`,
+        description: `${supportedFiles[0].name} uploaded and integrated into chat. Quick action buttons are now enabled!`,
       })
     } catch (err) {
       console.error("Upload failed:", err)
@@ -623,7 +482,6 @@ export default function LearnPage() {
       setIsUploading(false)
     }
   }
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(true)
@@ -644,29 +502,49 @@ export default function LearnPage() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Simplified handleActionClick with basic prompts
-  const handleActionClick = async (action: string, lessonId: number) => {
-    console.log("🚀 handleActionClick called with:", { action, lessonId })
+  // FIXED: Buttons now send specific chat messages that work
+  const handleActionClick = async (action: string) => {
+    console.log("🚀 handleActionClick called with:", { action })
+
+    if (!conversationId) {
+      toast({
+        title: "No Conversation",
+        description: "Please upload a file first to start a conversation.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
+    // Add user message to show what button was clicked
+    const actionMessages = {
+      summary: "create summary from the PDF",
+      lesson: "create lesson from the PDF",
+      quiz: "generate 10 quiz questions from the PDF",
+      flashcards: "create actual flashcards from the PDF",
+      workflow: "create workflow from the PDF",
+    }
+
+    const userPrompt = actionMessages[action as keyof typeof actionMessages] || `create ${action} from the PDF`
+
+    // Add user message to chat
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: userPrompt,
+      sender: "user",
+      timestamp: new Date(),
+      type: "text",
+    }
+    setMessages((prev: Message[]) => [...prev, userMessage])
+
     try {
-      // Use simple prompts that match what works when you type manually
-      const prompts = {
-        summary: "create summary",
-        lesson: "create lesson",
-        quiz: "generate quiz",
-        flashcards: "make flashcards",
-        workflow: "create workflow",
-      }
-
-      const prompt = prompts[action as keyof typeof prompts] || `create ${action}`
-
-      console.log("📝 Sending prompt:", prompt)
+      console.log("📝 Sending chat message:", userPrompt)
 
       const data = await chatAPI.sendMessage({
-        message: prompt,
+        message: userPrompt,
         user_id: user?.id || localStorage.getItem("trainpi_user_id") || "anonymous-user",
-        conversation_id: conversationId || localStorage.getItem("trainpi_conversation_id") || undefined,
+        conversation_id: conversationId, // IMPORTANT: Always pass conversation_id
         explanation_level:
           appliedExperienceLevel === "beginner"
             ? "5_year_old"
@@ -676,12 +554,13 @@ export default function LearnPage() {
                 ? "senior"
                 : "senior",
         framework: appliedFramework,
-        lesson_id: lessonId,
+        lesson_id: currentLessonId,
       })
 
       console.log("📨 Received response for", action, ":", data)
 
-      if (!conversationId && data?.conversation_id) {
+      // Update conversation_id if provided
+      if (data?.conversation_id && data.conversation_id !== conversationId) {
         setConversationId(data.conversation_id)
         try {
           localStorage.setItem("trainpi_conversation_id", data.conversation_id)
@@ -690,7 +569,7 @@ export default function LearnPage() {
 
       const rendered = processChatResponse(data, data?.response)
       if (!rendered && data?.response) {
-        console.log("⚠️ Structured parsing failed, using fallback text")
+        // Ensure we still show the textual response when no structured payload is found
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -701,10 +580,9 @@ export default function LearnPage() {
           },
         ])
       }
-
-      console.log("✅ Action handled successfully")
+      console.log("✅ Action handled via chat response")
     } catch (error) {
-      console.error(`❌ Failed to generate ${action} via chat:`, error)
+      console.error(`Failed to generate ${action} via chat:`, error)
       toast({
         title: "Generation Failed",
         description: `Failed to generate ${action}. Please try again.`,
@@ -844,9 +722,7 @@ export default function LearnPage() {
     setCurrentLessonId(null)
     setConversationId(null)
     setPdfContext("")
-    try {
-      localStorage.removeItem("trainpi_conversation_id")
-    } catch {}
+    setButtonsEnabled(false)
     toast({
       title: "Chat cleared",
       description: "All messages and context have been removed",
@@ -1073,56 +949,53 @@ export default function LearnPage() {
 
                   {/* Quick Actions + Input Area */}
                   <div className="border-t p-4 space-y-3">
-                    {/* Only show quick action buttons if we have uploaded files */}
-                    {uploadedFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent"
-                          onClick={() => handleActionClick("summary", currentLessonId ?? 0)}
-                          disabled={isLoading}
-                        >
-                          <Sparkles className="h-3 w-3 mr-1" /> Summary
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent"
-                          onClick={() => handleActionClick("lesson", currentLessonId ?? 0)}
-                          disabled={isLoading}
-                        >
-                          <Brain className="h-3 w-3 mr-1" /> Lesson
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent"
-                          onClick={() => handleActionClick("quiz", currentLessonId ?? 0)}
-                          disabled={isLoading}
-                        >
-                          <Target className="h-3 w-3 mr-1" /> Quiz
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent"
-                          onClick={() => handleActionClick("flashcards", currentLessonId ?? 0)}
-                          disabled={isLoading}
-                        >
-                          <FileText className="h-3 w-3 mr-1" /> Flashcards
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent"
-                          onClick={() => handleActionClick("workflow", currentLessonId ?? 0)}
-                          disabled={isLoading}
-                        >
-                          <Palette className="h-3 w-3 mr-1" /> Workflow
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("summary")}
+                        disabled={isLoading || !buttonsEnabled}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" /> Summary
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("lesson")}
+                        disabled={isLoading || !buttonsEnabled}
+                      >
+                        <Brain className="h-3 w-3 mr-1" /> Lesson
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("quiz")}
+                        disabled={isLoading || !buttonsEnabled}
+                      >
+                        <Target className="h-3 w-3 mr-1" /> Quiz
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("flashcards")}
+                        disabled={isLoading || !buttonsEnabled}
+                      >
+                        <FileText className="h-3 w-3 mr-1" /> Flashcards
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("workflow")}
+                        disabled={isLoading || !buttonsEnabled}
+                      >
+                        <Palette className="h-3 w-3 mr-1" /> Workflow
+                      </Button>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -1245,6 +1118,12 @@ export default function LearnPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Files:</span>
                       <Badge variant="default">{uploadedFiles.length}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Buttons:</span>
+                      <Badge variant={buttonsEnabled ? "default" : "secondary"}>
+                        {buttonsEnabled ? "Enabled" : "Disabled"}
+                      </Badge>
                     </div>
                   </div>
                 </div>
