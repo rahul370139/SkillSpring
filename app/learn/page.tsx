@@ -137,8 +137,11 @@ export default function LearnPage() {
   }, [user?.id])
   // Normalize and render structured chat responses (flashcards/quiz/workflow/lesson/summary)
   const processChatResponse = (data: any, fallbackText?: string) => {
+    const payload = data?.data ?? data
+    const type = payload?.type
+    // Prefer explicit type when provided
     // Flashcards mapping
-    const flashcards = data?.flashcards || data?.flashcard_data?.cards || data?.flashcardData || null
+    const flashcards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.flashcardData || null
     if (flashcards && Array.isArray(flashcards)) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -154,7 +157,7 @@ export default function LearnPage() {
     }
 
     // Quiz mapping
-    const quizQs = data?.quiz || data?.quiz_data?.questions || data?.quizData || null
+    const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.quizData || null
     if (quizQs && Array.isArray(quizQs)) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -170,12 +173,12 @@ export default function LearnPage() {
     }
 
     // Workflow mapping (array of steps or mermaid code)
-    const workflowSteps = Array.isArray(data?.workflow)
-      ? data.workflow
-      : Array.isArray(data?.workflow_data?.steps)
-        ? data.workflow_data.steps
-        : Array.isArray(data?.workflowData)
-          ? data.workflowData
+    const workflowSteps = Array.isArray(payload?.workflow)
+      ? payload.workflow
+      : Array.isArray(payload?.workflow_data?.steps)
+        ? payload.workflow_data.steps
+        : Array.isArray(payload?.workflowData)
+          ? payload.workflowData
           : null
     if (workflowSteps) {
       setMessages((prev: Message[]) => [
@@ -193,7 +196,7 @@ export default function LearnPage() {
     }
 
     // Lesson mapping (summary + bullets)
-    const lessonData = data?.lesson || data?.lesson_data || data?.lessonData
+    const lessonData = payload?.lesson || payload?.lesson_data || payload?.lessonData
     if (lessonData?.bullets || lessonData?.summary) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -214,7 +217,7 @@ export default function LearnPage() {
     }
 
     // Summary mapping (array of bullet strings)
-    const summaryBullets = data?.summary || data?.summary_data || data?.summaryData
+    const summaryBullets = payload?.summary || payload?.summary_data || payload?.summaryData
     if (Array.isArray(summaryBullets)) {
       const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
       setMessages((prev: Message[]) => [
@@ -232,7 +235,7 @@ export default function LearnPage() {
     }
 
     // Fallback to plain text
-    const text = data?.response || fallbackText || ""
+    const text = payload?.response || fallbackText || ""
     if (text) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -324,7 +327,7 @@ export default function LearnPage() {
       try { localStorage.setItem("trainpi_conversation_id", chatUploadResp.conversation_id) } catch {}
       setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
-      // Add the AI's response from chat upload and show quick actions
+      // Add the AI's response from chat upload (no quick action buttons)
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -335,14 +338,11 @@ export default function LearnPage() {
         },
         {
           id: (Date.now() + 1).toString(),
-          content: `✅ ${supportedFiles[0].name} uploaded and processed. You can use the quick actions below.`,
+          content: `✅ ${supportedFiles[0].name} uploaded and processed. Try: "create summary", "create lesson", "generate 10 quiz questions", "make 12 flashcards", or "create workflow".`,
           sender: "ai",
           timestamp: new Date(),
-          type: "actions",
-          files: [],
-          lesson_id: distillResp.lesson_id,
-          actions: ["summary", "lesson", "quiz", "flashcards", "workflow"],
-        } as Message & { lesson_id: number; actions: string[] }
+          type: "text",
+        }
       ])
       
       toast({
@@ -490,7 +490,7 @@ export default function LearnPage() {
       const data = await chatAPI.sendMessage({
         message: inputMessage,
         user_id: user?.id || "anonymous-user",
-        conversation_id: conversationId,
+        conversation_id: conversationId || localStorage.getItem("trainpi_conversation_id") || undefined,
         explanation_level: appliedExperienceLevel === "beginner" ? "5_year_old" : appliedExperienceLevel === "intermediate" ? "intern" : appliedExperienceLevel === "expert" ? "senior" : "senior",
         framework: appliedFramework,
         lesson_id: currentLessonId,
@@ -694,25 +694,7 @@ export default function LearnPage() {
                             )}
 
                             <div className="text-xs opacity-50 mt-1">
-                            {/* Quick action buttons send a normal chat message (unified flow) */}
-                            {message.type === "actions" && message.actions && (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {message.actions.map((action) => (
-                                  <Button
-                                    key={action}
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => {
-                                      console.log("Button clicked:", action, "lesson_id:", message.lesson_id)
-                                      handleActionClick(action, message.lesson_id!)
-                                    }}
-                                    disabled={isLoading || isUploading}
-                                  >
-                                    {action.charAt(0).toUpperCase() + action.slice(1)}
-                                  </Button>
-                                ))}
-                              </div>
-                            )}
+                            {/* Quick action buttons removed - use chat prompts */}
                               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </div>
                           </div>
