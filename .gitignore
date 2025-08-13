@@ -26,7 +26,7 @@ tests/
 # Data files
 *.csv
 *.xlsx
-*.json
+# Don't ignore package.json and vercel.json - they are essential for Node.js projects
 
 # Dependencies
 node_modules/
