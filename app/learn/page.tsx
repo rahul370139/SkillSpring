@@ -140,8 +140,98 @@ export default function LearnPage() {
     const payload = data?.data ?? data
     const type = payload?.type
     // Prefer explicit type when provided
+
+    // Type-directed mapping first (most reliable)
+    if (type === "quiz") {
+      const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.questions || payload?.content?.questions || null
+      if (quizQs && Array.isArray(quizQs)) {
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "quiz",
+            quizData: quizQs,
+          },
+        ])
+        return
+      }
+    }
+    if (type === "flashcards") {
+      const cards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.cards || payload?.content?.cards || null
+      if (cards && Array.isArray(cards)) {
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "flashcards",
+            flashcardData: cards,
+          },
+        ])
+        return
+      }
+    }
+    if (type === "workflow") {
+      const steps = payload?.workflow || payload?.workflow_data?.steps || payload?.content?.workflow || null
+      if (steps && Array.isArray(steps)) {
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "workflow",
+            content: steps.join("\n\n"),
+            workflowData: steps,
+          },
+        ])
+        return
+      }
+    }
+    if (type === "lesson") {
+      const lessonData = payload?.lesson || payload?.lesson_data || payload?.content || payload?.lessonData
+      if (lessonData?.bullets || lessonData?.summary) {
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "lesson",
+            lessonData: {
+              lesson_id: String(lessonData?.lesson_id || currentLessonId || ""),
+              bullets: lessonData?.bullets || [],
+              framework: lessonData?.framework || appliedFramework,
+              explanation_level: lessonData?.explanation_level || appliedExperienceLevel,
+            },
+          },
+        ])
+        return
+      }
+    }
+    if (type === "summary") {
+      const summaryBullets = payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
+      if (Array.isArray(summaryBullets)) {
+        const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "summary",
+            content: md,
+            summaryData: summaryBullets,
+          },
+        ])
+        return
+      }
+    }
     // Flashcards mapping
-    const flashcards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.flashcardData || null
+    const flashcards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.cards || payload?.flashcardData || null
     if (flashcards && Array.isArray(flashcards)) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -157,7 +247,7 @@ export default function LearnPage() {
     }
 
     // Quiz mapping
-    const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.quizData || null
+    const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.questions || payload?.quizData || null
     if (quizQs && Array.isArray(quizQs)) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -179,6 +269,8 @@ export default function LearnPage() {
         ? payload.workflow_data.steps
         : Array.isArray(payload?.workflowData)
           ? payload.workflowData
+          : Array.isArray(payload?.content?.workflow)
+            ? payload.content.workflow
           : null
     if (workflowSteps) {
       setMessages((prev: Message[]) => [
@@ -196,7 +288,7 @@ export default function LearnPage() {
     }
 
     // Lesson mapping (summary + bullets)
-    const lessonData = payload?.lesson || payload?.lesson_data || payload?.lessonData
+    const lessonData = payload?.lesson || payload?.lesson_data || payload?.content || payload?.lessonData
     if (lessonData?.bullets || lessonData?.summary) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -217,7 +309,7 @@ export default function LearnPage() {
     }
 
     // Summary mapping (array of bullet strings)
-    const summaryBullets = payload?.summary || payload?.summary_data || payload?.summaryData
+    const summaryBullets = payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
     if (Array.isArray(summaryBullets)) {
       const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
       setMessages((prev: Message[]) => [
@@ -425,6 +517,10 @@ export default function LearnPage() {
         framework: appliedFramework,
         lesson_id: lessonId,
       })
+      if (!conversationId && data?.conversation_id) {
+        setConversationId(data.conversation_id)
+        try { localStorage.setItem("trainpi_conversation_id", data.conversation_id) } catch {}
+      }
       processChatResponse(data, data?.response)
       console.log("Action handled via chat response")
     } catch (error) {
@@ -496,6 +592,10 @@ export default function LearnPage() {
         lesson_id: currentLessonId,
         context: context
       })
+      if (!conversationId && data?.conversation_id) {
+        setConversationId(data.conversation_id)
+        try { localStorage.setItem("trainpi_conversation_id", data.conversation_id) } catch {}
+      }
       processChatResponse(data, data?.response)
     } catch (error) {
       console.error("Error sending message:", error)
