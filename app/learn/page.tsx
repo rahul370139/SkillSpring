@@ -136,7 +136,7 @@ export default function LearnPage() {
     }
   }, [user?.id])
   // Normalize and render structured chat responses (flashcards/quiz/workflow/lesson/summary)
-  const processChatResponse = (data: any, fallbackText?: string) => {
+  const processChatResponse = (data: any, fallbackText?: string): boolean => {
     const payload = data?.data ?? data
     const type = payload?.type
     // Prefer explicit type when provided
@@ -155,7 +155,7 @@ export default function LearnPage() {
             quizData: quizQs,
           },
         ])
-        return
+        return true
       }
     }
     if (type === "flashcards") {
@@ -171,7 +171,7 @@ export default function LearnPage() {
             flashcardData: cards,
           },
         ])
-        return
+        return true
       }
     }
     if (type === "workflow") {
@@ -188,7 +188,7 @@ export default function LearnPage() {
             workflowData: steps,
           },
         ])
-        return
+        return true
       }
     }
     if (type === "lesson") {
@@ -209,7 +209,7 @@ export default function LearnPage() {
             },
           },
         ])
-        return
+        return true
       }
     }
     if (type === "summary") {
@@ -227,7 +227,7 @@ export default function LearnPage() {
             summaryData: summaryBullets,
           },
         ])
-        return
+        return true
       }
     }
     // Flashcards mapping
@@ -338,7 +338,9 @@ export default function LearnPage() {
           timestamp: new Date(),
         },
       ])
+      return true
     }
+    return false
   }
 
   useEffect(() => {
@@ -521,7 +523,19 @@ export default function LearnPage() {
         setConversationId(data.conversation_id)
         try { localStorage.setItem("trainpi_conversation_id", data.conversation_id) } catch {}
       }
-      processChatResponse(data, data?.response)
+      const rendered = processChatResponse(data, data?.response)
+      if (!rendered && data?.response) {
+        // Ensure we still show the textual response when no structured payload is found
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            content: data.response,
+            sender: "ai",
+            timestamp: new Date(),
+          },
+        ])
+      }
       console.log("Action handled via chat response")
     } catch (error) {
       console.error(`Failed to generate ${action} via chat:`, error)
@@ -596,7 +610,18 @@ export default function LearnPage() {
         setConversationId(data.conversation_id)
         try { localStorage.setItem("trainpi_conversation_id", data.conversation_id) } catch {}
       }
-      processChatResponse(data, data?.response)
+      const rendered = processChatResponse(data, data?.response)
+      if (!rendered && data?.response) {
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            content: data.response,
+            sender: "ai",
+            timestamp: new Date(),
+          },
+        ])
+      }
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
