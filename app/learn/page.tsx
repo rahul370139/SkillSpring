@@ -107,6 +107,34 @@ export default function LearnPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const footerFileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
+  
+  // Load persisted conversation_id on mount
+  useEffect(() => {
+    try {
+      const storedConversationId = localStorage.getItem("trainpi_conversation_id")
+      if (storedConversationId) {
+        setConversationId(storedConversationId)
+      }
+    } catch {}
+  }, [])
+  
+  // Persist conversation_id when it changes
+  useEffect(() => {
+    if (conversationId) {
+      try {
+        localStorage.setItem("trainpi_conversation_id", conversationId)
+      } catch {}
+    }
+  }, [conversationId])
+
+  // Persist user_id for consistency across calls
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        localStorage.setItem("trainpi_user_id", user.id)
+      } catch {}
+    }
+  }, [user?.id])
   // Normalize and render structured chat responses (flashcards/quiz/workflow/lesson/summary)
   const processChatResponse = (data: any, fallbackText?: string) => {
     // Flashcards mapping
@@ -293,9 +321,10 @@ export default function LearnPage() {
       setUploadedFiles(prev => [...prev, supportedFiles[0]])
       setCurrentLessonId(distillResp.lesson_id)
       setConversationId(chatUploadResp.conversation_id)
+      try { localStorage.setItem("trainpi_conversation_id", chatUploadResp.conversation_id) } catch {}
       setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
-      // Add the AI's response from chat upload to the conversation
+      // Add the AI's response from chat upload and show quick actions
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -306,13 +335,13 @@ export default function LearnPage() {
         },
         {
           id: (Date.now() + 1).toString(),
-          content: `✅ ${supportedFiles[0].name} uploaded and processed. What would you like to do?`,
+          content: `✅ ${supportedFiles[0].name} uploaded and processed. You can use the quick actions below.`,
           sender: "ai",
           timestamp: new Date(),
           type: "actions",
           files: [],
           lesson_id: distillResp.lesson_id,
-          actions: distillResp.actions || ["summary", "lesson", "quiz", "flashcards", "workflow"],
+          actions: ["summary", "lesson", "quiz", "flashcards", "workflow"],
         } as Message & { lesson_id: number; actions: string[] }
       ])
       
@@ -370,11 +399,21 @@ export default function LearnPage() {
     console.log("handleActionClick called with:", { action, lessonId })
     setIsLoading(true)
     try {
-      const prompt = `create ${action}`
+      // Map quick actions to meaningful prompts
+      const prompt =
+        action === "summary"
+          ? "create summary"
+          : action === "lesson"
+            ? "create lesson"
+            : action === "quiz"
+              ? "generate 10 quiz questions"
+              : action === "flashcards"
+                ? "make 12 flashcards"
+                : "create workflow"
       const data = await chatAPI.sendMessage({
         message: prompt,
-        user_id: user?.id || "anonymous-user",
-        conversation_id: conversationId || undefined,
+        user_id: user?.id || localStorage.getItem("trainpi_user_id") || "anonymous-user",
+        conversation_id: conversationId || localStorage.getItem("trainpi_conversation_id") || undefined,
         explanation_level:
           appliedExperienceLevel === "beginner"
             ? "5_year_old"
@@ -655,7 +694,7 @@ export default function LearnPage() {
                             )}
 
                             <div className="text-xs opacity-50 mt-1">
-                            {/* Render option buttons when type==="actions" */}
+                            {/* Quick action buttons send a normal chat message (unified flow) */}
                             {message.type === "actions" && message.actions && (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {message.actions.map((action) => (
