@@ -44,17 +44,14 @@ interface Message {
   timestamp: Date
   files?: File[]
   type?: "text" | "file" | "actions" | "lesson" | "summary" | "flashcards" | "quiz" | "workflow"
-  // NEW fields for messages of type="actions":
   lesson_id?: number
   actions?: string[]
-  // NEW fields for messages of type="lesson":
   lessonData?: {
     lesson_id: string
     bullets: string[]
     framework: string
     explanation_level: string
   }
-  // NEW fields for individual action types:
   summaryData?: string[]
   flashcardData?: Array<{ front: string; back: string }>
   quizData?: Array<{ question: string; options: string[]; answer: string }>
@@ -141,89 +138,117 @@ export default function LearnPage() {
     }
   }, [user?.id])
 
-  // Enhanced function to detect fallback/mock data
-  const isFallbackData = (data: any, type: string): boolean => {
-    if (!data) return true
+  // COMPLETELY REWRITTEN processChatResponse function with comprehensive parsing
+  const processChatResponse = (data: any, fallbackText?: string): boolean => {
+    console.log("🔍 RAW API RESPONSE:", JSON.stringify(data, null, 2))
 
-    switch (type) {
-      case "quiz":
-        // Check for common fallback patterns in quiz data
-        const quizText = JSON.stringify(data).toLowerCase()
-        return (
-          quizText.includes("sample question") ||
-          quizText.includes("example question") ||
-          quizText.includes("placeholder") ||
-          quizText.includes("mock") ||
-          quizText.includes("fallback") ||
-          (Array.isArray(data) && data.length < 3) // Too few questions suggests fallback
-        )
+    // Try to extract the actual response data from various possible structures
+    let responseData = data
+    let responseText = ""
 
-      case "flashcards":
-        // Check for common fallback patterns in flashcard data
-        const flashcardText = JSON.stringify(data).toLowerCase()
-        return (
-          flashcardText.includes("sample card") ||
-          flashcardText.includes("example card") ||
-          flashcardText.includes("placeholder") ||
-          flashcardText.includes("mock") ||
-          flashcardText.includes("fallback") ||
-          (Array.isArray(data) && data.length < 5) // Too few cards suggests fallback
-        )
-
-      case "workflow":
-        // Check for common fallback patterns in workflow data
-        const workflowText = JSON.stringify(data).toLowerCase()
-        return (
-          workflowText.includes("sample step") ||
-          workflowText.includes("example step") ||
-          workflowText.includes("placeholder") ||
-          workflowText.includes("mock") ||
-          workflowText.includes("fallback") ||
-          (Array.isArray(data) && data.length < 3) // Too few steps suggests fallback
-        )
-
-      default:
-        return false
+    // Handle different response structures
+    if (data?.data) {
+      responseData = data.data
     }
-  }
+    if (data?.response) {
+      responseText = data.response
+    }
+    if (data?.message) {
+      responseText = data.message
+    }
+    if (fallbackText) {
+      responseText = fallbackText
+    }
 
-  // Improved function to process chat responses with fallback detection
-  const processChatResponse = (data: any, fallbackText?: string, requestType?: string): boolean => {
-    console.log("🔍 Processing chat response:", JSON.stringify(data, null, 2))
+    console.log("📊 Processed responseData:", responseData)
+    console.log("📄 Response text:", responseText)
 
-    const payload = data?.data ?? data
-    const type = payload?.type || requestType
+    // Function to recursively search for data in nested objects
+    const findDataInObject = (obj: any, keys: string[]): any => {
+      if (!obj || typeof obj !== "object") return null
 
-    console.log("📊 Extracted payload:", payload)
-    console.log("🏷️ Type detected:", type)
-
-    // Handle quiz responses
-    if (type === "quiz" || payload?.quiz || payload?.quiz_data || payload?.questions) {
-      const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.questions || payload?.content?.questions
-      console.log("🧩 Quiz questions found:", quizQs)
-
-      if (quizQs && Array.isArray(quizQs) && quizQs.length > 0) {
-        // Check if this is fallback data
-        if (isFallbackData(quizQs, "quiz")) {
-          console.log("⚠️ Detected fallback quiz data, requesting actual content...")
-          // Don't process fallback data, instead request actual content
-          setTimeout(() => {
-            handleActionClick("actual_quiz", currentLessonId ?? 0)
-          }, 1000)
-          return false
+      for (const key of keys) {
+        if (obj[key]) {
+          console.log(`✅ Found data at key: ${key}`, obj[key])
+          return obj[key]
         }
+      }
 
-        // Validate quiz structure
-        const validQuiz = quizQs.filter((q) => q && (q.question || typeof q === "string") && q.options && q.answer)
-        console.log("✅ Valid quiz questions:", validQuiz)
+      // Search nested objects
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === "object" && value !== null) {
+          const found = findDataInObject(value, keys)
+          if (found) return found
+        }
+      }
 
-        if (validQuiz.length > 0) {
-          const preview = validQuiz
-            .map((q: any, idx: number) => {
-              const text = typeof q === "string" ? q : q?.question || JSON.stringify(q)
-              return `${idx + 1}. ${text}`
-            })
-            .join("\n")
+      return null
+    }
+
+    // Try to parse JSON from response text if it contains JSON
+    let parsedFromText = null
+    if (responseText && typeof responseText === "string") {
+      // Look for JSON blocks
+      const jsonMatches = [
+        responseText.match(/```json\s*([\s\S]*?)\s*```/),
+        responseText.match(/\{[\s\S]*\}/),
+        responseText.match(/\[[\s\S]*\]/),
+      ]
+
+      for (const match of jsonMatches) {
+        if (match) {
+          try {
+            parsedFromText = JSON.parse(match[1] || match[0])
+            console.log("🔍 Parsed JSON from text:", parsedFromText)
+            break
+          } catch (e) {
+            console.log("❌ Failed to parse JSON:", e)
+          }
+        }
+      }
+    }
+
+    // QUIZ PROCESSING - Check all possible locations
+    const quizSources = [
+      responseData?.quiz,
+      responseData?.quiz_data?.questions,
+      responseData?.questions,
+      responseData?.content?.questions,
+      responseData?.data?.quiz,
+      responseData?.data?.questions,
+      parsedFromText?.quiz,
+      parsedFromText?.questions,
+      parsedFromText?.quiz_data?.questions,
+      // Check if the entire response is a quiz array
+      Array.isArray(responseData) ? responseData : null,
+      Array.isArray(parsedFromText) ? parsedFromText : null,
+    ]
+
+    for (const quizData of quizSources) {
+      if (quizData && Array.isArray(quizData) && quizData.length > 0) {
+        console.log("🧩 Found quiz data:", quizData)
+
+        // Normalize quiz format
+        const normalizedQuiz = quizData.map((item: any, index: number) => {
+          if (typeof item === "string") {
+            return {
+              question: item,
+              options: [`Option A`, `Option B`, `Option C`, `Option D`],
+              answer: "A",
+            }
+          }
+
+          return {
+            question: item?.question || item?.q || item?.text || `Question ${index + 1}`,
+            options: item?.options ||
+              item?.choices ||
+              item?.answers || [`Option A`, `Option B`, `Option C`, `Option D`],
+            answer: item?.answer || item?.correct || item?.correctAnswer || "A",
+          }
+        })
+
+        if (normalizedQuiz.length > 0) {
+          const preview = normalizedQuiz.map((q: any, idx: number) => `${idx + 1}. ${q.question}`).join("\n")
 
           setMessages((prev: Message[]) => [
             ...prev,
@@ -232,7 +257,7 @@ export default function LearnPage() {
               sender: "ai",
               timestamp: new Date(),
               type: "quiz",
-              quizData: validQuiz,
+              quizData: normalizedQuiz,
               content: preview,
             },
           ])
@@ -241,34 +266,43 @@ export default function LearnPage() {
       }
     }
 
-    // Handle flashcards responses
-    if (type === "flashcards" || payload?.flashcards || payload?.flashcard_data || payload?.cards) {
-      const cards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.cards || payload?.content?.cards
-      console.log("🃏 Flashcards found:", cards)
+    // FLASHCARDS PROCESSING - Check all possible locations
+    const flashcardSources = [
+      responseData?.flashcards,
+      responseData?.flashcard_data?.cards,
+      responseData?.cards,
+      responseData?.content?.cards,
+      responseData?.data?.flashcards,
+      responseData?.data?.cards,
+      parsedFromText?.flashcards,
+      parsedFromText?.cards,
+      parsedFromText?.flashcard_data?.cards,
+      // Check if the entire response is a flashcards array
+      Array.isArray(responseData) ? responseData : null,
+      Array.isArray(parsedFromText) ? parsedFromText : null,
+    ]
 
-      if (cards && Array.isArray(cards) && cards.length > 0) {
-        // Check if this is fallback data
-        if (isFallbackData(cards, "flashcards")) {
-          console.log("⚠️ Detected fallback flashcard data, requesting actual content...")
-          // Don't process fallback data, instead request actual content
-          setTimeout(() => {
-            handleActionClick("actual_flashcards", currentLessonId ?? 0)
-          }, 1000)
-          return false
-        }
+    for (const flashcardData of flashcardSources) {
+      if (flashcardData && Array.isArray(flashcardData) && flashcardData.length > 0) {
+        console.log("🃏 Found flashcard data:", flashcardData)
 
-        // Validate flashcard structure
-        const validCards = cards.filter((c) => c && (c.front || c.question) && (c.back || c.answer))
-        console.log("✅ Valid flashcards:", validCards)
+        // Normalize flashcard format
+        const normalizedFlashcards = flashcardData.map((item: any, index: number) => {
+          if (typeof item === "string") {
+            return {
+              front: item,
+              back: `Answer ${index + 1}`,
+            }
+          }
 
-        if (validCards.length > 0) {
-          // Normalize flashcard format
-          const normalizedCards = validCards.map((c) => ({
-            front: c.front || c.question || "Question",
-            back: c.back || c.answer || "Answer",
-          }))
+          return {
+            front: item?.front || item?.question || item?.term || item?.q || `Question ${index + 1}`,
+            back: item?.back || item?.answer || item?.definition || item?.a || `Answer ${index + 1}`,
+          }
+        })
 
-          const preview = normalizedCards
+        if (normalizedFlashcards.length > 0) {
+          const preview = normalizedFlashcards
             .map((c: any, idx: number) => `• ${idx + 1}. ${c.front} → ${c.back}`)
             .join("\n")
 
@@ -279,7 +313,7 @@ export default function LearnPage() {
               sender: "ai",
               timestamp: new Date(),
               type: "flashcards",
-              flashcardData: normalizedCards,
+              flashcardData: normalizedFlashcards,
               content: preview,
             },
           ])
@@ -288,41 +322,66 @@ export default function LearnPage() {
       }
     }
 
-    // Handle workflow responses
-    if (type === "workflow" || payload?.workflow || payload?.workflow_data) {
-      const steps = payload?.workflow || payload?.workflow_data?.steps || payload?.content?.workflow
-      const mermaid = payload?.workflow_data?.mermaid_code
+    // WORKFLOW PROCESSING - Check all possible locations
+    const workflowSources = [
+      responseData?.workflow,
+      responseData?.workflow_data?.steps,
+      responseData?.steps,
+      responseData?.content?.workflow,
+      responseData?.content?.steps,
+      responseData?.data?.workflow,
+      responseData?.data?.steps,
+      parsedFromText?.workflow,
+      parsedFromText?.steps,
+      parsedFromText?.workflow_data?.steps,
+      // Check if the entire response is a workflow array
+      Array.isArray(responseData) ? responseData : null,
+      Array.isArray(parsedFromText) ? parsedFromText : null,
+    ]
 
-      console.log("🔄 Workflow steps found:", steps)
-      console.log("📊 Mermaid code found:", mermaid)
+    for (const workflowData of workflowSources) {
+      if (workflowData && Array.isArray(workflowData) && workflowData.length > 0) {
+        console.log("🔄 Found workflow data:", workflowData)
 
-      if (steps && Array.isArray(steps) && steps.length > 0) {
-        // Check if this is fallback data
-        if (isFallbackData(steps, "workflow")) {
-          console.log("⚠️ Detected fallback workflow data, requesting actual content...")
-          // Don't process fallback data, instead request actual content
-          setTimeout(() => {
-            handleActionClick("actual_workflow", currentLessonId ?? 0)
-          }, 1000)
-          return false
+        // Normalize workflow format
+        const normalizedWorkflow = workflowData.map((item: any, index: number) => {
+          if (typeof item === "string") {
+            return item
+          }
+          return item?.step || item?.description || item?.text || `Step ${index + 1}`
+        })
+
+        if (normalizedWorkflow.length > 0) {
+          setMessages((prev: Message[]) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              sender: "ai",
+              timestamp: new Date(),
+              type: "workflow",
+              content: normalizedWorkflow.join("\n\n"),
+              workflowData: normalizedWorkflow,
+            },
+          ])
+          return true
         }
-
-        setMessages((prev: Message[]) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "ai",
-            timestamp: new Date(),
-            type: "workflow",
-            content: steps.join("\n\n"),
-            workflowData: steps,
-          },
-        ])
-        return true
       }
+    }
 
-      if (typeof mermaid === "string" && mermaid.trim().length > 0) {
-        const md = ["```mermaid", mermaid.trim(), "```"].join("\n")
+    // Check for mermaid workflow
+    const mermaidSources = [
+      responseData?.workflow_data?.mermaid_code,
+      responseData?.mermaid,
+      responseData?.mermaid_code,
+      parsedFromText?.workflow_data?.mermaid_code,
+      parsedFromText?.mermaid,
+      parsedFromText?.mermaid_code,
+    ]
+
+    for (const mermaidCode of mermaidSources) {
+      if (typeof mermaidCode === "string" && mermaidCode.trim().length > 0) {
+        console.log("📊 Found mermaid code:", mermaidCode)
+        const md = ["```mermaid", mermaidCode.trim(), "```"].join("\n")
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -337,12 +396,20 @@ export default function LearnPage() {
       }
     }
 
-    // Handle lesson responses
-    if (type === "lesson" || payload?.lesson || payload?.lesson_data) {
-      const lessonData = payload?.lesson || payload?.lesson_data || payload?.content || payload?.lessonData
-      console.log("📚 Lesson data found:", lessonData)
+    // LESSON PROCESSING - Check all possible locations
+    const lessonSources = [
+      responseData?.lesson,
+      responseData?.lesson_data,
+      responseData?.content,
+      responseData?.data?.lesson,
+      parsedFromText?.lesson,
+      parsedFromText?.lesson_data,
+      parsedFromText?.content,
+    ]
 
+    for (const lessonData of lessonSources) {
       if (lessonData && (lessonData.bullets || lessonData.summary)) {
+        console.log("📚 Found lesson data:", lessonData)
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -362,18 +429,23 @@ export default function LearnPage() {
       }
     }
 
-    // Handle summary responses
-    if (type === "summary" || payload?.summary || payload?.summary_data) {
-      const summaryBullets =
-        payload?.summary_data?.key_points ||
-        payload?.summary ||
-        payload?.summary_data ||
-        payload?.content ||
-        payload?.summaryData
-      console.log("📝 Summary bullets found:", summaryBullets)
+    // SUMMARY PROCESSING - Check all possible locations
+    const summarySources = [
+      responseData?.summary_data?.key_points,
+      responseData?.summary,
+      responseData?.summary_data,
+      responseData?.content,
+      responseData?.data?.summary,
+      parsedFromText?.summary_data?.key_points,
+      parsedFromText?.summary,
+      parsedFromText?.summary_data,
+      parsedFromText?.content,
+    ]
 
-      if (Array.isArray(summaryBullets) && summaryBullets.length > 0) {
-        const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
+    for (const summaryData of summarySources) {
+      if (Array.isArray(summaryData) && summaryData.length > 0) {
+        console.log("📝 Found summary data:", summaryData)
+        const md = summaryData.map((pt: string) => `- **${pt}**`).join("\n")
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -382,34 +454,15 @@ export default function LearnPage() {
             timestamp: new Date(),
             type: "summary",
             content: md,
-            summaryData: summaryBullets,
+            summaryData: summaryData,
           },
         ])
         return true
       }
     }
 
-    // Try to extract structured data from response text if no explicit type
-    const responseText = payload?.response || fallbackText || ""
-    console.log("📄 Response text:", responseText)
-
-    // Try to parse JSON from response text
-    if (responseText && typeof responseText === "string") {
-      try {
-        // Look for JSON blocks in the response
-        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          const jsonData = JSON.parse(jsonMatch[1] || jsonMatch[0])
-          console.log("🔍 Found JSON in response:", jsonData)
-          return processChatResponse(jsonData, responseText, requestType)
-        }
-      } catch (e) {
-        console.log("❌ Failed to parse JSON from response")
-      }
-    }
-
-    // Fallback to plain text
-    if (responseText) {
+    // Fallback to plain text if we have response text
+    if (responseText && responseText.trim().length > 0) {
       console.log("📝 Using fallback text response")
       setMessages((prev: Message[]) => [
         ...prev,
@@ -534,7 +587,7 @@ export default function LearnPage() {
         },
         {
           id: (Date.now() + 1).toString(),
-          content: `✅ ${supportedFiles[0].name} uploaded and processed. Try the quick action buttons below or ask: "create summary", "create lesson", "generate 10 quiz questions", "make 12 flashcards", or "create workflow".`,
+          content: `✅ ${supportedFiles[0].name} uploaded and processed. Try the quick action buttons below!`,
           sender: "ai",
           timestamp: new Date(),
           type: "text",
@@ -591,33 +644,22 @@ export default function LearnPage() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Enhanced handleActionClick with "actual" prompts to bypass fallback data
+  // Simplified handleActionClick with basic prompts
   const handleActionClick = async (action: string, lessonId: number) => {
     console.log("🚀 handleActionClick called with:", { action, lessonId })
     setIsLoading(true)
 
     try {
-      // Create prompts that explicitly request "actual" content to bypass fallback data
+      // Use simple prompts that match what works when you type manually
       const prompts = {
-        summary:
-          "Please create an actual detailed summary of the uploaded document. Format your response as a structured summary with key points in bullet format. Do not use placeholder or sample content.",
-        lesson:
-          "Please create an actual comprehensive lesson from the uploaded document. Include key learning objectives and main concepts in a structured format. Do not use placeholder or sample content.",
-        quiz: "Please generate actual quiz questions based on the uploaded document content. I need exactly 10 real multiple choice questions with 4 options (A, B, C, D) and the correct answer. Do not use sample, placeholder, or mock questions. Generate actual questions from the document content.",
-        flashcards:
-          "Please create actual flashcards from the uploaded document content. I need exactly 12 real flashcards with specific questions on the front and detailed answers on the back. Do not use sample, placeholder, or mock flashcards. Generate actual flashcards from the document content.",
-        workflow:
-          "Please create an actual step-by-step workflow based on the content in the uploaded document. Present it as a real sequence of steps from the document. Do not use sample, placeholder, or mock steps. Generate actual workflow from the document content.",
-        // Special "actual" variants for fallback detection
-        actual_quiz:
-          "Give me the actual quiz questions from the document content. I don't want sample or placeholder questions. Generate real quiz questions based on the actual content of the uploaded document.",
-        actual_flashcards:
-          "Give me actual flashcards from the document content. I don't want sample or placeholder flashcards. Generate real flashcards based on the actual content of the uploaded document.",
-        actual_workflow:
-          "Give me the actual workflow from the document content. I don't want sample or placeholder steps. Generate real workflow based on the actual content of the uploaded document.",
+        summary: "create summary",
+        lesson: "create lesson",
+        quiz: "generate quiz",
+        flashcards: "make flashcards",
+        workflow: "create workflow",
       }
 
-      const prompt = prompts[action as keyof typeof prompts] || `create actual ${action} from the document content`
+      const prompt = prompts[action as keyof typeof prompts] || `create ${action}`
 
       console.log("📝 Sending prompt:", prompt)
 
@@ -637,7 +679,7 @@ export default function LearnPage() {
         lesson_id: lessonId,
       })
 
-      console.log("📨 Received response:", data)
+      console.log("📨 Received response for", action, ":", data)
 
       if (!conversationId && data?.conversation_id) {
         setConversationId(data.conversation_id)
@@ -646,12 +688,9 @@ export default function LearnPage() {
         } catch {}
       }
 
-      // Pass the action type to help with processing
-      const baseAction = action.replace("actual_", "")
-      const rendered = processChatResponse(data, data?.response, baseAction)
+      const rendered = processChatResponse(data, data?.response)
       if (!rendered && data?.response) {
         console.log("⚠️ Structured parsing failed, using fallback text")
-        // Ensure we still show the textual response when no structured payload is found
         setMessages((prev: Message[]) => [
           ...prev,
           {
