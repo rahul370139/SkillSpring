@@ -67,8 +67,8 @@ export const learnAPI = {
       body: JSON.stringify(data),
     }),
 
-  getLessonContentForChat: (lessonId: string) =>
-    apiCall<any>(`/api/chat/lesson/${lessonId}/content`),
+  getLessonContentForChat: (lessonId: string, userId: string) =>
+    apiCall<any>(`/api/chat/lesson/${lessonId}/content?user_id=${encodeURIComponent(userId)}`),
 
   // Framework & Skills
   getFrameworks: () => apiCall<string[]>("/api/frameworks"),

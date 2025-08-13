@@ -145,6 +145,12 @@ export default function LearnPage() {
     if (type === "quiz") {
       const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.questions || payload?.content?.questions || null
       if (quizQs && Array.isArray(quizQs)) {
+        const preview = quizQs
+          .map((q: any, idx: number) => {
+            const text = typeof q === "string" ? q : q?.question || JSON.stringify(q)
+            return `${idx + 1}. ${text}`
+          })
+          .join("\n")
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -153,6 +159,7 @@ export default function LearnPage() {
             timestamp: new Date(),
             type: "quiz",
             quizData: quizQs,
+            content: preview,
           },
         ])
         return true
@@ -161,6 +168,9 @@ export default function LearnPage() {
     if (type === "flashcards") {
       const cards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.cards || payload?.content?.cards || null
       if (cards && Array.isArray(cards)) {
+        const preview = cards
+          .map((c: any, idx: number) => `• ${idx + 1}. ${c?.front ?? ""} → ${c?.back ?? ""}`)
+          .join("\n")
         setMessages((prev: Message[]) => [
           ...prev,
           {
@@ -169,6 +179,7 @@ export default function LearnPage() {
             timestamp: new Date(),
             type: "flashcards",
             flashcardData: cards,
+            content: preview,
           },
         ])
         return true
@@ -186,6 +197,21 @@ export default function LearnPage() {
             type: "workflow",
             content: steps.join("\n\n"),
             workflowData: steps,
+          },
+        ])
+        return true
+      }
+      const mermaid = payload?.workflow_data?.mermaid_code
+      if (typeof mermaid === "string" && mermaid.trim().length > 0) {
+        const md = ["```mermaid", mermaid.trim(), "```"] .join("\n")
+        setMessages((prev: Message[]) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            timestamp: new Date(),
+            type: "workflow",
+            content: md,
           },
         ])
         return true
@@ -213,7 +239,7 @@ export default function LearnPage() {
       }
     }
     if (type === "summary") {
-      const summaryBullets = payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
+      const summaryBullets = payload?.summary_data?.key_points || payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
       if (Array.isArray(summaryBullets)) {
         const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
         setMessages((prev: Message[]) => [
@@ -233,6 +259,9 @@ export default function LearnPage() {
     // Flashcards mapping
     const flashcards = payload?.flashcards || payload?.flashcard_data?.cards || payload?.cards || payload?.flashcardData || null
     if (flashcards && Array.isArray(flashcards)) {
+      const preview = flashcards
+        .map((c: any, idx: number) => `• ${idx + 1}. ${c?.front ?? ""} → ${c?.back ?? ""}`)
+        .join("\n")
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -241,14 +270,21 @@ export default function LearnPage() {
           timestamp: new Date(),
           type: "flashcards",
           flashcardData: flashcards,
+          content: preview,
         },
       ])
-      return
+      return true
     }
 
     // Quiz mapping
     const quizQs = payload?.quiz || payload?.quiz_data?.questions || payload?.questions || payload?.quizData || null
     if (quizQs && Array.isArray(quizQs)) {
+      const preview = quizQs
+        .map((q: any, idx: number) => {
+          const text = typeof q === "string" ? q : q?.question || JSON.stringify(q)
+          return `${idx + 1}. ${text}`
+        })
+        .join("\n")
       setMessages((prev: Message[]) => [
         ...prev,
         {
@@ -257,9 +293,10 @@ export default function LearnPage() {
           timestamp: new Date(),
           type: "quiz",
           quizData: quizQs,
+          content: preview,
         },
       ])
-      return
+      return true
     }
 
     // Workflow mapping (array of steps or mermaid code)
@@ -284,7 +321,22 @@ export default function LearnPage() {
           workflowData: workflowSteps,
         },
       ])
-      return
+      return true
+    }
+    const mermaid = payload?.workflow_data?.mermaid_code
+    if (typeof mermaid === "string" && mermaid.trim().length > 0) {
+      const md = ["```mermaid", mermaid.trim(), "```"] .join("\n")
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "ai",
+          timestamp: new Date(),
+          type: "workflow",
+          content: md,
+        },
+      ])
+      return true
     }
 
     // Lesson mapping (summary + bullets)
@@ -305,11 +357,11 @@ export default function LearnPage() {
           },
         },
       ])
-      return
+      return true
     }
 
     // Summary mapping (array of bullet strings)
-    const summaryBullets = payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
+    const summaryBullets = payload?.summary_data?.key_points || payload?.summary || payload?.summary_data || payload?.content || payload?.summaryData
     if (Array.isArray(summaryBullets)) {
       const md = summaryBullets.map((pt: string) => `- **${pt}**`).join("\n")
       setMessages((prev: Message[]) => [
@@ -323,7 +375,7 @@ export default function LearnPage() {
           summaryData: summaryBullets,
         },
       ])
-      return
+      return true
     }
 
     // Fallback to plain text
@@ -566,9 +618,12 @@ export default function LearnPage() {
     try {
       // Get lesson content for chat context if available
       let lessonContent = ""
-      if (currentLessonId && conversationId) {
+      if (currentLessonId && (user?.id || localStorage.getItem("trainpi_user_id"))) {
         try {
-          const lessonData = await learnAPI.getLessonContentForChat(currentLessonId.toString())
+          const lessonData = await learnAPI.getLessonContentForChat(
+            currentLessonId.toString(),
+            user?.id || (localStorage.getItem("trainpi_user_id") as string) || "anonymous-user"
+          )
           lessonContent = lessonData.content || ""
           console.log("Lesson content loaded for chat:", lessonContent.substring(0, 200) + "...")
         } catch (error) {
@@ -880,8 +935,55 @@ export default function LearnPage() {
                     </div>
                   )}
 
-                  {/* Input Area */}
-                  <div className="border-t p-4">
+                  {/* Quick Actions + Input Area */}
+                  <div className="border-t p-4 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("summary", currentLessonId ?? 0)}
+                        disabled={isLoading}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" /> Summary
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("lesson", currentLessonId ?? 0)}
+                        disabled={isLoading}
+                      >
+                        <Brain className="h-3 w-3 mr-1" /> Lesson
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("quiz", currentLessonId ?? 0)}
+                        disabled={isLoading}
+                      >
+                        <Target className="h-3 w-3 mr-1" /> Quiz
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("flashcards", currentLessonId ?? 0)}
+                        disabled={isLoading}
+                      >
+                        <FileText className="h-3 w-3 mr-1" /> Flashcards
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => handleActionClick("workflow", currentLessonId ?? 0)}
+                        disabled={isLoading}
+                      >
+                        <Palette className="h-3 w-3 mr-1" /> Workflow
+                      </Button>
+                    </div>
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
