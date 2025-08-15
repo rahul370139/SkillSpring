@@ -2,6 +2,11 @@
 
 A modern, intelligent microlearning platform built with Next.js 14, TypeScript, and AI integration to provide personalized learning experiences.
 
+Demo Preview: https://skillspring001.vercel.app/
+
+Backend Repo: https://github.com/rahul370139/Backend_skillspring
+
+
 ## 🚀 Features
 
 ### Core Learning Features
