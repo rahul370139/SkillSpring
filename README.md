@@ -146,14 +146,4 @@ OPENAI_API_KEY=your_openai_api_key
 - **Collaborative Learning**: Group learning features
 - **Content Marketplace**: Third-party content integration
 
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines and code of conduct.
-
-## 📞 Support
-
-For support and questions, please open an issue on GitHub or contact the development team.
+Try out my demo here: skillspring001.vercel.app
