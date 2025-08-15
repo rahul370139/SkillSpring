@@ -146,4 +146,4 @@ OPENAI_API_KEY=your_openai_api_key
 - **Collaborative Learning**: Group learning features
 - **Content Marketplace**: Third-party content integration
 
-Try out my demo here: skillspring001.vercel.app
+Try out my demo here: https://skillspring001.vercel.app/
