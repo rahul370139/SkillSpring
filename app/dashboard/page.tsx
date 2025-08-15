@@ -375,7 +375,7 @@ export default function DashboardPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `trainpi-progress-${new Date().toISOString().split("T")[0]}.json`
+            a.download = `skillspring-progress-${new Date().toISOString().split("T")[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
 

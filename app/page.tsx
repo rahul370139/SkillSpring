@@ -11,19 +11,19 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="text-center space-y-8 py-20">
         <div className="space-y-6">
-          {/* TrainPI Logo and Name */}
+          {/* SkillSpring Logo and Name */}
           <div className="flex items-center justify-center space-x-4 mb-6">
             <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Capture.JPG-bBXs5Wjv3D3iFNOdJNFeQUnaJmtJkh.jpeg"
-              alt="TrainPI Logo"
+              alt="SkillSpring Logo"
               width={60}
               height={60}
               className="rounded-lg"
             />
             <div className="text-center">
               <h1 className="text-5xl font-bold">
-                <span className="text-blue-600">TRAIN</span>
-                <span className="text-orange-500">PI</span>
+                <span className="text-blue-600">SKILL</span>
+                <span className="text-orange-500">SPRING</span>
               </h1>
               <Badge variant="secondary" className="px-4 py-1 text-sm font-medium mt-2">
                 🚀 AI-Powered Learning Platform
@@ -83,7 +83,7 @@ export default function Landing() {
       {/* Features Section - Now with Clickable Cards */}
       <section className="space-y-12">
         <div className="text-center space-y-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">Why Choose TrainPI?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">Why Choose SkillSpring?</h2>
           <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
             Experience the future of learning with our cutting-edge AI technology
           </p>
@@ -217,7 +217,7 @@ export default function Landing() {
                 ))}
               </div>
               <p className="text-slate-600 dark:text-slate-300 mb-4">
-                "TrainPI transformed my learning experience. The micro-lessons are perfect for my busy schedule!"
+                "SkillSpring transformed my learning experience. The micro-lessons are perfect for my busy schedule!"
               </p>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
@@ -282,7 +282,7 @@ export default function Landing() {
         <div className="space-y-4">
           <h2 className="text-3xl md:text-4xl font-bold">Ready to Transform Your Career?</h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Join thousands of professionals who are already accelerating their growth with TrainPI.
+            Join thousands of professionals who are already accelerating their growth with SkillSpring.
           </p>
         </div>
 

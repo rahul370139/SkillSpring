@@ -117,7 +117,7 @@ export default function LearnPage() {
   // Load persisted conversation_id on mount
   useEffect(() => {
     try {
-      const storedConversationId = localStorage.getItem("trainpi_conversation_id")
+      const storedConversationId = localStorage.getItem("skillspring_conversation_id")
       if (storedConversationId) {
         setConversationId(storedConversationId)
       }
@@ -128,7 +128,7 @@ export default function LearnPage() {
   useEffect(() => {
     if (conversationId) {
       try {
-        localStorage.setItem("trainpi_conversation_id", conversationId)
+        localStorage.setItem("skillspring_conversation_id", conversationId)
       } catch {}
     }
   }, [conversationId])
@@ -137,7 +137,7 @@ export default function LearnPage() {
   useEffect(() => {
     if (user?.id) {
       try {
-        localStorage.setItem("trainpi_user_id", user.id)
+        localStorage.setItem("skillspring_user_id", user.id)
       } catch {}
     }
   }, [user?.id])
@@ -417,7 +417,7 @@ export default function LearnPage() {
       setCurrentLessonId(distillResp.lesson_id)
       setConversationId(chatUploadResp.conversation_id)
       try {
-        localStorage.setItem("trainpi_conversation_id", chatUploadResp.conversation_id)
+        localStorage.setItem("skillspring_conversation_id", chatUploadResp.conversation_id)
       } catch {}
       setPdfContext(`PDF: ${supportedFiles[0].name} (Lesson ID: ${distillResp.lesson_id})`)
 
@@ -543,7 +543,7 @@ export default function LearnPage() {
 
       const data = await chatAPI.sendMessage({
         message: userPrompt,
-        user_id: user?.id || localStorage.getItem("trainpi_user_id") || "anonymous-user",
+        user_id: user?.id || localStorage.getItem("skillspring_user_id") || "anonymous-user",
         conversation_id: conversationId, // IMPORTANT: Always pass conversation_id
         explanation_level:
           appliedExperienceLevel === "beginner"
@@ -563,7 +563,7 @@ export default function LearnPage() {
       if (data?.conversation_id && data.conversation_id !== conversationId) {
         setConversationId(data.conversation_id)
         try {
-          localStorage.setItem("trainpi_conversation_id", data.conversation_id)
+          localStorage.setItem("skillspring_conversation_id", data.conversation_id)
         } catch {}
       }
 
@@ -615,7 +615,7 @@ export default function LearnPage() {
         try {
           const lessonData = await learnAPI.getLessonContentForChat(
             currentLessonId.toString(),
-            user?.id || (localStorage.getItem("trainpi_user_id") as string) || "anonymous-user",
+            user?.id || (localStorage.getItem("skillspring_user_id") as string) || "anonymous-user",
           )
           lessonContent = lessonData.content || ""
           console.log("Lesson content loaded for chat:", lessonContent.substring(0, 200) + "...")
@@ -648,7 +648,7 @@ export default function LearnPage() {
       const data = await chatAPI.sendMessage({
         message: inputMessage,
         user_id: user?.id || "anonymous-user",
-        conversation_id: conversationId || localStorage.getItem("trainpi_conversation_id") || undefined,
+        conversation_id: conversationId || localStorage.getItem("skillspring_conversation_id") || undefined,
         explanation_level:
           appliedExperienceLevel === "beginner"
             ? "5_year_old"
@@ -665,7 +665,7 @@ export default function LearnPage() {
       if (!conversationId && data?.conversation_id) {
         setConversationId(data.conversation_id)
         try {
-          localStorage.setItem("trainpi_conversation_id", data.conversation_id)
+          localStorage.setItem("skillspring_conversation_id", data.conversation_id)
         } catch {}
       }
 

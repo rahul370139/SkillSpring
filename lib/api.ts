@@ -1,4 +1,4 @@
-// Centralized API service for TrainPI backend integration
+// Centralized API service for SkillSpring backend integration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app";
 
 // Generic API call helper
