@@ -10,7 +10,7 @@ import AuthProvider from "@/components/auth-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "SkillSpring - AI-Powered Learning Platform",
+  title: "TrainPI - AI-Powered Learning Platform",
   description: "Transform your learning with AI-powered microlearning and personalized education paths",
     generator: 'v0.dev'
 }
