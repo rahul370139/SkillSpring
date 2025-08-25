@@ -3,23 +3,71 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import type { User } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  avatar?: string
-}
 
 interface AuthContextType {
   user: User | null
-  loginWithMagicLink: (email: string) => Promise<void>
-  logout: () => Promise<void>
-  isLoading: boolean
+  loading: boolean
+  signIn: (email: string, password: string) => Promise<any>
+  signUp: (email: string, password: string) => Promise<any>
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
+  }
+
+  const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    return { data, error }
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const value = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
 
 export function useAuth() {
   const context = useContext(AuthContext)
@@ -29,84 +77,5 @@ export function useAuth() {
   return context
 }
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { data } = await supabase.auth.getSession()
-        const session = data.session
-        if (session?.user) {
-          const sUser = session.user
-          setUser({
-            id: sUser.id,
-            name: (sUser.user_metadata?.full_name as string) || (sUser.email?.split("@")[0] as string) || "User",
-            email: sUser.email || "",
-            avatar: (sUser.user_metadata?.avatar_url as string) || undefined,
-          })
-        } else {
-          setUser(null)
-        }
-      } catch (error) {
-        console.error("Auth init failed:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const sUser = session.user
-        setUser({
-          id: sUser.id,
-          name: (sUser.user_metadata?.full_name as string) || (sUser.email?.split("@")[0] as string) || "User",
-          email: sUser.email || "",
-          avatar: (sUser.user_metadata?.avatar_url as string) || undefined,
-        })
-      } else {
-        setUser(null)
-      }
-    })
-
-    init()
-    return () => {
-      listener.subscription.unsubscribe()
-    }
-  }, [])
-
-  const loginWithMagicLink = async (email: string) => {
-    setIsLoading(true)
-    try {
-      await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
-      })
-    } catch (error) {
-      console.error("Login with magic link failed:", error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut()
-    } catch (error) {
-      console.error("Logout failed:", error)
-    } finally {
-      setUser(null)
-    }
-  }
-
-  const value = {
-    user,
-    loginWithMagicLink,
-    logout,
-    isLoading,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
+// Export as default for compatibility
+export default AuthProvider
