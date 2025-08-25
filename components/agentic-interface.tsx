@@ -32,7 +32,6 @@ import { agenticAPI } from "@/lib/api"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { LessonDisplay } from "@/components/lesson-display"
-import { FlashcardPlayer, QuizPlayer } from "@/components/lesson-display"
 
 interface AgenticInterfaceProps {
   uploadedFiles: File[]
@@ -121,8 +120,18 @@ export function AgenticInterface({
   }, [messages])
 
   useEffect(() => {
-    if (userId && userId !== "anonymous-user") {
+    // Only load mastery data for authenticated users
+    if (userId && userId !== "anonymous-user" && userId !== "anonymous") {
       loadMasteryData()
+    } else {
+      // Set default mastery data for anonymous users
+      setMasteryData({
+        overall_score: 0,
+        topic_scores: {},
+        skill_breakdown: {},
+        learning_progress: {},
+        recommended_topics: ["Sign in to track your learning progress"],
+      })
     }
   }, [userId])
 
@@ -157,7 +166,7 @@ export function AgenticInterface({
         topic_scores: {},
         skill_breakdown: {},
         learning_progress: {},
-        recommended_topics: [],
+        recommended_topics: ["Complete assessments to track your progress"],
       })
     }
   }
@@ -567,12 +576,12 @@ export function AgenticInterface({
         await loadMasteryData()
         if (masteryData) {
           let masteryContent = "## 📊 Your Learning Progress\n\n"
-          masteryContent += `**Overall Mastery:** ${Math.round(masteryData.overall_score)}%\n\n`
+          masteryContent += `**Overall Mastery:** ${Math.round(masteryData.overall_score * 100)}%\n\n`
 
           if (Object.keys(masteryData.topic_scores).length > 0) {
             masteryContent += "### Topic Scores:\n"
             Object.entries(masteryData.topic_scores).forEach(([topic, score]) => {
-              masteryContent += `• **${topic}:** ${Math.round(score as number)}%\n`
+              masteryContent += `• **${topic}:** ${Math.round((score as number) * 100)}%\n`
             })
             masteryContent += "\n"
           }
@@ -609,6 +618,11 @@ export function AgenticInterface({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const removeUploadedFile = (index: number) => {
+    // This would need to be handled by the parent component
+    console.log("Remove file at index:", index)
   }
 
   return (
@@ -682,9 +696,9 @@ export function AgenticInterface({
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Overall Mastery</span>
-                      <Badge variant="secondary">{Math.round(masteryData.overall_score)}%</Badge>
+                      <Badge variant="secondary">{Math.round(masteryData.overall_score * 100)}%</Badge>
                     </div>
-                    <Progress value={masteryData.overall_score} className="h-2" />
+                    <Progress value={masteryData.overall_score * 100} className="h-2" />
 
                     {masteryData.recommended_topics.length > 0 && (
                       <div className="space-y-2">
@@ -813,14 +827,6 @@ export function AgenticInterface({
                 {message.contentType === "lesson" && message.lessonData ? (
                   <div className="mt-3">
                     <LessonDisplay lesson={message.lessonData} />
-                  </div>
-                ) : message.contentType === "flashcards" && message.flashcardData ? (
-                  <div className="mt-3">
-                    <FlashcardPlayer flashcards={message.flashcardData} />
-                  </div>
-                ) : message.contentType === "quiz" && message.quizData ? (
-                  <div className="mt-3">
-                    <QuizPlayer quizItems={message.quizData} />
                   </div>
                 ) : (
                   <div className="text-sm prose dark:prose-invert max-w-none">
