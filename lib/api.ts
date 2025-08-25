@@ -1,458 +1,231 @@
-// Centralized API service for TrainPI backend integration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://trainbackend-production.up.railway.app"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 
-// Generic API call helper
-async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      ...options,
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`API Error ${response.status}: ${errorText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error(`API call failed for ${endpoint}:`, error)
-    throw error
-  }
-}
-
-// Health & Debug Endpoints
-export const healthAPI = {
-  check: () => apiCall<{ status: string }>("/health"),
-  test: () => apiCall<{ message: string }>("/api/test"),
-  debugLesson: (lessonId: string) => apiCall<any>(`/api/debug/lesson/${lessonId}`),
-}
-
-// Learn Page Endpoints
-export const learnAPI = {
-  // PDF Processing & Lesson Management
-  distill: (file: File, ownerId: string) => {
-    const formData = new FormData()
-    formData.append("file", file)
-
-    return fetch(`${API_BASE_URL}/api/distill?owner_id=${ownerId}`, {
-      method: "POST",
-      body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Distill failed: ${res.status}`)
-      return res.json()
-    })
-  },
-
-  getLessonContent: (lessonId: string, action: string) => apiCall<any>(`/api/lesson/${lessonId}/${action}`),
-
-  generateLessonContent: (lessonId: string, action: string, data: any) =>
-    apiCall<any>(`/api/lesson/${lessonId}/${action}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getLessonSummary: (data: any) =>
-    apiCall<any>("/api/chat/lesson/summary", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getLessonContentForChat: (lessonId: string, userId: string) =>
-    apiCall<any>(`/api/chat/lesson/${lessonId}/content?user_id=${encodeURIComponent(userId)}`),
-
-  // Framework & Skills
-  getFrameworks: () => apiCall<string[]>("/api/frameworks"),
-  getSkills: () => apiCall<string[]>("/api/skills"),
-  getExplanationLevels: () => apiCall<string[]>("/api/explanation-levels"),
-  getLessonsByFramework: (framework: string) => apiCall<any[]>(`/api/lessons/framework/${framework}`),
-
-  // Micro Lessons
-  getMicroLessons: () => apiCall<any[]>("/api/lessons/micro"),
-  searchLessons: (query: any) =>
-    apiCall<any>("/api/lessons/search", {
-      method: "POST",
-      body: JSON.stringify(query),
-    }),
-
-  // User Progress
-  completeLesson: (lessonId: string, userId: string, progressPercentage = 100.0) =>
-    apiCall<any>(`/api/lessons/${lessonId}/complete`, {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: userId,
-        progress_percentage: progressPercentage,
-      }),
-    }),
-
-  getCompletedLessons: (userId: string) => apiCall<any[]>(`/api/users/${userId}/completed-lessons`),
-
-  getUserProgress: (userId: string) => apiCall<any>(`/api/users/${userId}/progress`),
-}
-
-// Career Page Endpoints
-export const careerAPI = {
-  // Career Quiz & Matching
-  getCareerQuiz: () => apiCall<any>("/api/career/quiz"),
-
-  matchCareer: (data: any) =>
-    apiCall<any>("/api/career/match", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getComprehensiveAnalysis: (data: any) =>
-    apiCall<any>("/api/career/quiz/comprehensive-analysis", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  // Career Roadmaps
-  getCareerRoadmap: (careerTitle: string) => apiCall<any>(`/api/career/roadmap/${careerTitle}`),
-
-  getAllRoadmaps: () => apiCall<any[]>("/api/career/roadmaps"),
-
-  generateRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/generate", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  generateEnhancedRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/enhanced", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  generateUnifiedRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/unified", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  generateVisualRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/visual", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  clearRoadmapCache: () => apiCall<any>("/api/career/roadmap/cache/clear"),
-
-  // Career Planning
-  generateCareerPlanning: (data: any) =>
-    apiCall<any>("/api/career/planning", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getCareerPlanningOptions: () => apiCall<any>("/api/career/planning/options"),
-
-  generateComprehensivePlan: (data: any) =>
-    apiCall<any>("/api/career/comprehensive-plan", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getAvailableCareers: () => apiCall<string[]>("/api/career/available"),
-
-  // Career Guidance & Advice
-  getCareerGuidance: (data: any) =>
-    apiCall<any>("/api/career/guidance", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getCareerAdvice: (data: any) =>
-    apiCall<any>("/api/career/advice", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getCareerAdviceTopics: () => apiCall<string[]>("/api/career/advice/topics"),
-
-  // Interview Preparation
-  startInterviewSimulation: (data: any) =>
-    apiCall<any>("/api/career/interview/start", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  submitInterviewAnswer: (data: any) =>
-    apiCall<any>("/api/career/interview/answer", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getInterviewRoles: () => apiCall<string[]>("/api/career/interview/roles"),
-
-  generateInterviewPrep: (data: any) =>
-    apiCall<any>("/api/career/roadmap/interview-prep", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  // Career Sessions
-  getUserCareerSessions: (userId: string) => apiCall<any[]>(`/api/career/sessions/${userId}`),
-}
-
-// Chat Page Endpoints
+// Chat API functions
 export const chatAPI = {
-  // Chat Functionality
-  sendMessage: (data: any) =>
-    apiCall<any>("/api/chat", {
+  sendMessage: async (data: {
+    message: string
+    user_id: string
+    conversation_id?: string
+    explanation_level?: string
+    framework?: string
+    lesson_id?: number | null
+    context?: string
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/chat/send`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
-
-  uploadFile: (file: File, userId: string, conversationId?: string, explanationLevel?: string) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    if (conversationId) formData.append("conversation_id", conversationId)
-    // per backend spec, explanation_level should be sent in the query, not as form field
-
-    const url = `${API_BASE_URL}/api/chat/upload?user_id=${encodeURIComponent(userId)}${explanationLevel ? `&explanation_level=${encodeURIComponent(explanationLevel)}` : ""}`
-
-    return fetch(url, {
-      method: "POST",
-      body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
-      return res.json()
     })
+    if (!response.ok) throw new Error(`Chat API error: ${response.status}`)
+    return response.json()
   },
 
-  ingestDistilled: (lessonId: string, userId: string, data: any) =>
-    apiCall<any>(`/api/chat/ingest-distilled?lesson_id=${lessonId}&user_id=${encodeURIComponent(userId)}`, {
+  uploadFile: async (file: File, userId: string, conversationId?: string, explanationLevel?: string) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("user_id", userId)
+    if (conversationId) formData.append("conversation_id", conversationId)
+    if (explanationLevel) formData.append("explanation_level", explanationLevel)
+
+    const response = await fetch(`${API_BASE_URL}/api/chat/upload`, {
       method: "POST",
-      body: JSON.stringify(data),
-    }),
+      body: formData,
+    })
+    if (!response.ok) throw new Error(`Upload API error: ${response.status}`)
+    return response.json()
+  },
 
-  // Chat Management
-  getUserConversations: (userId: string) => apiCall<any[]>(`/api/chat/conversations/${userId}`),
+  ingestDistilled: async (
+    lessonId: string,
+    userId: string,
+    options?: {
+      conversation_id?: string
+      explanation_level?: string
+      framework?: string
+    },
+  ) => {
+    const response = await fetch(`${API_BASE_URL}/api/chat/ingest-distilled`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lesson_id: lessonId,
+        user_id: userId,
+        ...options,
+      }),
+    })
+    if (!response.ok) throw new Error(`Ingest API error: ${response.status}`)
+    return response.json()
+  },
 
-  getConversation: (conversationId: string) => apiCall<any>(`/api/chat/conversation/${conversationId}`),
-
-  getChatSideMenu: (userId: string) => apiCall<any>(`/api/chat/side-menu/${userId}`),
-
-  // Chat Preferences
-  updateExplanationLevel: (userId: string, level: string) =>
-    apiCall<any>(`/api/chat/preferences/explanation-level`, {
-      method: "PUT",
-      body: JSON.stringify({ user_id: userId, level }),
-    }),
-
-  updateFrameworkPreference: (userId: string, framework: string) =>
-    apiCall<any>(`/api/chat/preferences/framework`, {
-      method: "PUT",
-      body: JSON.stringify({ user_id: userId, framework }),
-    }),
+  getUserConversations: async (userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${userId}`)
+    if (!response.ok) throw new Error(`Conversations API error: ${response.status}`)
+    return response.json()
+  },
 }
 
-// Agentic AI Endpoints
+// Learn API functions
+export const learnAPI = {
+  distill: async (file: File, ownerId: string) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("owner_id", ownerId)
+
+    const response = await fetch(`${API_BASE_URL}/api/distill`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) throw new Error(`Distill API error: ${response.status}`)
+    return response.json()
+  },
+
+  getLessonContentForChat: async (lessonId: string, userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/lessons/${lessonId}/content?user_id=${userId}`)
+    if (!response.ok) throw new Error(`Lesson content API error: ${response.status}`)
+    return response.json()
+  },
+}
+
+// Agentic API functions
 export const agenticAPI = {
-  // Intent Detection & Routing
-  routeMessage: (data: { message: string; pdf_id?: string; user_id?: string }) =>
-    apiCall<{
-      intent: string
-      confidence: number
-      message: string
-      context: any
-      suggestions?: string[]
-    }>("/api/agent/route", {
+  // Intent routing
+  routeMessage: async (data: {
+    message: string
+    pdf_id?: string
+    user_id: string
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/route`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
+    })
+    if (!response.ok) throw new Error(`Route API error: ${response.status}`)
+    return response.json()
+  },
 
-  // Summary Agent
-  generateSummary: (data: { pdf_id: string; user_id: string; topic?: string }) =>
-    apiCall<{
-      summary: string
-      concept_map: any
-      key_points: string[]
-      page_references: any
-    }>("/api/agent/summary", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  // Diagnostic Agent
-  startDiagnostic: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
-    apiCall<{
-      questions: Array<{
-        question: string
-        options: string[]
-        correct_answer: string
-      }>
-      mastery_before: any
-      session_id: string
-      estimated_duration: string
-    }>("/api/agent/diagnostic", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  processDiagnosticResults: (data: {
+  // Summary generation
+  generateSummary: async (data: {
     pdf_id: string
     user_id: string
     topic?: string
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/summary`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) throw new Error(`Summary API error: ${response.status}`)
+    return response.json()
+  },
+
+  // Diagnostic testing
+  startDiagnostic: async (data: {
+    pdf_id: string
+    user_id: string
+    topic?: string
+    num?: number
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/diagnostic/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) throw new Error(`Diagnostic API error: ${response.status}`)
+    return response.json()
+  },
+
+  processDiagnosticResults: async (data: {
+    pdf_id: string
+    user_id: string
+    session_id: string
     user_answers: Array<{
       question_index: number
       selected_answer: string
       is_correct: boolean
     }>
-    session_id: string
-  }) =>
-    apiCall<{
-      status: string
-      results: {
-        mastery_after: any
-        skill_gaps: string[]
-        recommendations: string[]
-        improvement_score: number
-        next_steps: string[]
-      }
-    }>("/api/agent/diagnostic/results", {
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/diagnostic/results`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
-
-  // Mastery Tracking
-  getMastery: (userId: string, topic?: string) => {
-    const url = `/api/agent/mastery/${userId}${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`
-    return apiCall<{
-      status: string
-      mastery: {
-        overall_score: number
-        topic_scores: Record<string, number>
-        skill_breakdown: Record<string, number>
-        learning_progress: any
-        recommended_topics: string[]
-      }
-    }>(url)
+    })
+    if (!response.ok) throw new Error(`Diagnostic results API error: ${response.status}`)
+    return response.json()
   },
 
-  // Content Generation
-  generateWorkflow: (data: { pdf_id: string; user_id: string; topic?: string }) =>
-    apiCall<{
-      workflow: Array<{
-        step: number
-        action: string
-        description: string
-        estimated_time?: string
-        resources?: string[]
-      }>
-      total_steps: number
-      estimated_duration: string
-      difficulty_level: string
-    }>("/api/agent/workflow", {
+  // Mastery tracking
+  getMastery: async (userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/mastery/${userId}`)
+    if (!response.ok) throw new Error(`Mastery API error: ${response.status}`)
+    return response.json()
+  },
+
+  updateMastery: async (data: {
+    user_id: string
+    topic: string
+    score: number
+    skill_data?: Record<string, any>
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/mastery/update`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
+    })
+    if (!response.ok) throw new Error(`Update mastery API error: ${response.status}`)
+    return response.json()
+  },
 
-  generateFlashcards: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
-    apiCall<{
-      flashcards: Array<{
-        front: string
-        back: string
-      }>
-      total_cards: number
-      difficulty_level: string
-    }>("/api/agent/flashcards", {
+  // Content generation
+  generateContent: async (data: {
+    pdf_id: string
+    user_id: string
+    content_type: "lesson" | "quiz" | "flashcards" | "workflow"
+    topic?: string
+    difficulty?: string
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/generate`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
+    })
+    if (!response.ok) throw new Error(`Content generation API error: ${response.status}`)
+    return response.json()
+  },
 
-  generateQuiz: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
-    apiCall<{
-      questions: Array<{
-        question: string
-        options: string[]
-        correct_answer: string
-        explanation?: string
-      }>
-      total_questions: number
-      difficulty_level: string
-    }>("/api/agent/quiz", {
+  // Personalized recommendations
+  getRecommendations: async (data: {
+    user_id: string
+    pdf_id?: string
+    learning_style?: string
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/recommendations`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
+    })
+    if (!response.ok) throw new Error(`Recommendations API error: ${response.status}`)
+    return response.json()
+  },
 
-  // System Testing
-  testSystem: () => apiCall<{ status: string; message: string }>("/api/agent/test"),
-}
-
-// Dashboard Page Endpoints
-export const dashboardAPI = {
-  // Dashboard Analytics
-  getUserAnalytics: (userId: string) => apiCall<any>(`/api/dashboard/analytics/${userId}`),
-
-  getUserProgress: (userId: string) => apiCall<any>(`/api/dashboard/progress/${userId}`),
-
-  getUserAchievements: (userId: string) => apiCall<any>(`/api/dashboard/achievements/${userId}`),
-
-  // Dashboard Recommendations
-  getDashboardRecommendations: (data: any) =>
-    apiCall<any>("/api/dashboard/recommendations", {
+  // Learning path optimization
+  optimizePath: async (data: {
+    user_id: string
+    current_mastery: Record<string, number>
+    target_skills: string[]
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/optimize-path`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }),
+    })
+    if (!response.ok) throw new Error(`Path optimization API error: ${response.status}`)
+    return response.json()
+  },
 
-  getCareerCoaching: (data: any) =>
-    apiCall<any>("/api/dashboard/coaching", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-}
-
-// User Management Endpoints
-export const userAPI = {
-  updateUserRole: (userId: string, role: string) =>
-    apiCall<any>(`/api/users/${userId}/role`, {
-      method: "PUT",
-      body: JSON.stringify({ role }),
-    }),
-
-  getUserRole: (userId: string) => apiCall<any>(`/api/users/${userId}/role`),
-}
-
-// Recommendation Endpoints
-export const recommendationAPI = {
-  getGeneralRecommendations: (data: any) =>
-    apiCall<any>("/api/recommendations", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getPersonalizedRecommendations: (data: any) =>
-    apiCall<any>("/api/recommendations/personalized", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  getUserRecommendations: (userId: string) => apiCall<any>(`/api/recommendations/user/${userId}`),
-
-  getMarketTrends: () => apiCall<any>("/api/recommendations/market-trends"),
-  getLearningPaths: () => apiCall<any>("/api/recommendations/learning-paths"),
-}
-
-// Analytics Endpoints
-export const analyticsAPI = {
-  getUserAnalytics: (userId: string) => apiCall<any>(`/api/analytics/user/${userId}`),
-}
-
-export default {
-  health: healthAPI,
-  learn: learnAPI,
-  career: careerAPI,
-  chat: chatAPI,
-  agentic: agenticAPI,
-  dashboard: dashboardAPI,
-  user: userAPI,
-  recommendation: recommendationAPI,
-  analytics: analyticsAPI,
+  // System health check
+  healthCheck: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/agentic/health`)
+    if (!response.ok) throw new Error(`Health check API error: ${response.status}`)
+    return response.json()
+  },
 }

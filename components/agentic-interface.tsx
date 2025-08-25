@@ -22,11 +22,17 @@ import {
   Award,
   ArrowRight,
   AlertCircle,
+  Brain,
+  FileText,
+  Palette,
+  Zap,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { agenticAPI } from "@/lib/api"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { LessonDisplay } from "@/components/lesson-display"
+import { FlashcardPlayer, QuizPlayer } from "@/components/lesson-display"
 
 interface AgenticInterfaceProps {
   uploadedFiles: File[]
@@ -50,6 +56,17 @@ interface AgentMessage {
   intent?: string
   confidence?: number
   data?: any
+  contentType?: "lesson" | "quiz" | "flashcards" | "workflow" | "summary"
+  lessonData?: {
+    lesson_id: string
+    bullets: string[]
+    framework: string
+    explanation_level: string
+  }
+  summaryData?: string[]
+  flashcardData?: Array<{ front: string; back: string }>
+  quizData?: Array<{ question: string; options: string[]; answer: string }>
+  workflowData?: string[]
 }
 
 interface MasteryData {
@@ -155,6 +172,121 @@ export function AgenticInterface({
     }
     setMessages((prev) => [...prev, message])
     return message
+  }
+
+  // Process agentic response data similar to chat interface
+  const processAgenticResponse = (data: any, contentType?: string): boolean => {
+    console.log("🔍 Processing agentic response:", JSON.stringify(data, null, 2))
+
+    const payload = data?.data ?? data
+    const responseText = payload?.response || payload?.summary || ""
+
+    // Handle different content types
+    if (contentType === "lesson" || payload?.lesson_data || payload?.bullets) {
+      const lessonData = payload?.lesson_data || payload
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "agent",
+          timestamp: new Date(),
+          contentType: "lesson",
+          content: "Generated lesson content:",
+          lessonData: {
+            lesson_id: String(lessonData?.lesson_id || currentLessonId || ""),
+            bullets: lessonData?.bullets || lessonData?.key_points || [],
+            framework: lessonData?.framework || framework,
+            explanation_level: lessonData?.explanation_level || experienceLevel,
+          },
+        },
+      ])
+      return true
+    }
+
+    if (contentType === "quiz" || payload?.quiz || payload?.questions) {
+      const quizData = payload?.quiz || payload?.questions || []
+      const normalizedQuiz = quizData.map((item: any, index: number) => ({
+        question: item?.question || item?.q || `Question ${index + 1}`,
+        options: item?.options || item?.choices || [`Option A`, `Option B`, `Option C`, `Option D`],
+        answer: item?.answer || item?.correct || "A",
+      }))
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "agent",
+          timestamp: new Date(),
+          contentType: "quiz",
+          content: "Generated quiz questions:",
+          quizData: normalizedQuiz,
+        },
+      ])
+      return true
+    }
+
+    if (contentType === "flashcards" || payload?.flashcards || payload?.cards) {
+      const flashcardData = payload?.flashcards || payload?.cards || []
+      const normalizedFlashcards = flashcardData.map((item: any, index: number) => ({
+        front: item?.front || item?.question || `Question ${index + 1}`,
+        back: item?.back || item?.answer || `Answer ${index + 1}`,
+      }))
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "agent",
+          timestamp: new Date(),
+          contentType: "flashcards",
+          content: "Generated flashcards:",
+          flashcardData: normalizedFlashcards,
+        },
+      ])
+      return true
+    }
+
+    if (contentType === "workflow" || payload?.workflow || payload?.steps) {
+      const workflowSteps = payload?.workflow || payload?.steps || []
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "agent",
+          timestamp: new Date(),
+          contentType: "workflow",
+          content: workflowSteps.join("\n\n"),
+          workflowData: workflowSteps,
+        },
+      ])
+      return true
+    }
+
+    if (contentType === "summary" || payload?.summary || payload?.key_points) {
+      const summaryData =
+        payload?.key_points || (Array.isArray(payload?.summary) ? payload.summary : [payload?.summary])
+      const md = summaryData.map((pt: string) => `- **${pt}**`).join("\n")
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "agent",
+          timestamp: new Date(),
+          contentType: "summary",
+          content: md,
+          summaryData: summaryData,
+        },
+      ])
+      return true
+    }
+
+    // Fallback to plain text
+    if (responseText) {
+      addMessage("agent", responseText, payload)
+      return true
+    }
+
+    return false
   }
 
   const handleSendMessage = async () => {
@@ -399,18 +531,83 @@ export function AgenticInterface({
     }
   }
 
+  // Quick action handlers for agentic interface
   const handleQuickAction = async (action: string) => {
+    if (!currentLessonId) {
+      toast({
+        title: "No Document",
+        description: "Please upload a PDF first to use quick actions.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+
+    // Add user message to show what button was clicked
     const actionMessages = {
       summary: "Please provide a comprehensive summary of the uploaded document",
+      lesson: "Create a structured lesson from the PDF content",
       diagnostic: "I'd like to take a diagnostic test to assess my understanding",
+      quiz: "Generate quiz questions from the PDF content",
+      flashcards: "Create flashcards from the PDF content",
+      workflow: "Create a workflow diagram from the PDF content",
       mastery: "Show me my current mastery levels and progress",
     }
 
-    const message = actionMessages[action as keyof typeof actionMessages]
-    if (message) {
-      setInputMessage(message)
-      // Auto-send the message
-      setTimeout(() => handleSendMessage(), 100)
+    const userPrompt = actionMessages[action as keyof typeof actionMessages] || `Generate ${action} from the PDF`
+    addMessage("user", userPrompt)
+
+    try {
+      if (action === "summary") {
+        await handleSummaryRequest(userPrompt)
+      } else if (action === "diagnostic") {
+        await handleDiagnosticRequest(userPrompt)
+      } else if (action === "mastery") {
+        await loadMasteryData()
+        if (masteryData) {
+          let masteryContent = "## 📊 Your Learning Progress\n\n"
+          masteryContent += `**Overall Mastery:** ${Math.round(masteryData.overall_score)}%\n\n`
+
+          if (Object.keys(masteryData.topic_scores).length > 0) {
+            masteryContent += "### Topic Scores:\n"
+            Object.entries(masteryData.topic_scores).forEach(([topic, score]) => {
+              masteryContent += `• **${topic}:** ${Math.round(score as number)}%\n`
+            })
+            masteryContent += "\n"
+          }
+
+          if (masteryData.recommended_topics.length > 0) {
+            masteryContent += "### Recommended Focus Areas:\n"
+            masteryData.recommended_topics.forEach((topic) => {
+              masteryContent += `• ${topic}\n`
+            })
+          }
+
+          addMessage("agent", masteryContent, masteryData)
+        }
+      } else {
+        // Handle other content generation (lesson, quiz, flashcards, workflow)
+        const contentResponse = await agenticAPI.generateContent({
+          pdf_id: currentLessonId.toString(),
+          user_id: userId,
+          content_type: action as "lesson" | "quiz" | "flashcards" | "workflow",
+          difficulty: experienceLevel,
+        })
+
+        console.log(`${action} response:`, contentResponse)
+        processAgenticResponse(contentResponse, action)
+      }
+    } catch (error) {
+      console.error(`Failed to generate ${action}:`, error)
+      addMessage("system", `Failed to generate ${action}. Please try again.`)
+      toast({
+        title: "Generation Failed",
+        description: `Failed to generate ${action}. Please try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -505,33 +702,77 @@ export function AgenticInterface({
                 </Card>
               )}
 
+              {/* Quick Action Buttons */}
               <div className="flex flex-wrap gap-2 justify-center">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAction("summary")}
                   className="bg-transparent"
+                  disabled={isLoading}
                 >
                   <Sparkles className="h-3 w-3 mr-1" />
-                  Get Summary
+                  Summary
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickAction("lesson")}
+                  className="bg-transparent"
+                  disabled={isLoading}
+                >
+                  <Brain className="h-3 w-3 mr-1" />
+                  Lesson
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAction("diagnostic")}
                   className="bg-transparent"
+                  disabled={isLoading}
                 >
                   <Target className="h-3 w-3 mr-1" />
-                  Take Diagnostic
+                  Diagnostic
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickAction("quiz")}
+                  className="bg-transparent"
+                  disabled={isLoading}
+                >
+                  <Zap className="h-3 w-3 mr-1" />
+                  Quiz
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickAction("flashcards")}
+                  className="bg-transparent"
+                  disabled={isLoading}
+                >
+                  <FileText className="h-3 w-3 mr-1" />
+                  Flashcards
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickAction("workflow")}
+                  className="bg-transparent"
+                  disabled={isLoading}
+                >
+                  <Palette className="h-3 w-3 mr-1" />
+                  Workflow
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAction("mastery")}
                   className="bg-transparent"
+                  disabled={isLoading}
                 >
                   <Award className="h-3 w-3 mr-1" />
-                  View Progress
+                  Progress
                 </Button>
               </div>
             </div>
@@ -568,9 +809,24 @@ export function AgenticInterface({
                       : "bg-muted text-muted-foreground"
                 }`}
               >
-                <div className="text-sm prose dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                </div>
+                {/* Render different content types */}
+                {message.contentType === "lesson" && message.lessonData ? (
+                  <div className="mt-3">
+                    <LessonDisplay lesson={message.lessonData} />
+                  </div>
+                ) : message.contentType === "flashcards" && message.flashcardData ? (
+                  <div className="mt-3">
+                    <FlashcardPlayer flashcards={message.flashcardData} />
+                  </div>
+                ) : message.contentType === "quiz" && message.quizData ? (
+                  <div className="mt-3">
+                    <QuizPlayer quizItems={message.quizData} />
+                  </div>
+                ) : (
+                  <div className="text-sm prose dark:prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                  </div>
+                )}
 
                 {message.data?.intent && (
                   <div className="mt-2 flex items-center gap-2">
@@ -680,6 +936,77 @@ export function AgenticInterface({
           )}
         </div>
       </ScrollArea>
+
+      {/* Quick Actions Bar (when file is uploaded) */}
+      {uploadedFiles.length > 0 && !isInDiagnostic && (
+        <div className="border-t p-4 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("summary")}
+              disabled={isLoading}
+            >
+              <Sparkles className="h-3 w-3 mr-1" /> Summary
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("lesson")}
+              disabled={isLoading}
+            >
+              <Brain className="h-3 w-3 mr-1" /> Lesson
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("diagnostic")}
+              disabled={isLoading}
+            >
+              <Target className="h-3 w-3 mr-1" /> Diagnostic
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("quiz")}
+              disabled={isLoading}
+            >
+              <Zap className="h-3 w-3 mr-1" /> Quiz
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("flashcards")}
+              disabled={isLoading}
+            >
+              <FileText className="h-3 w-3 mr-1" /> Flashcards
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("workflow")}
+              disabled={isLoading}
+            >
+              <Palette className="h-3 w-3 mr-1" /> Workflow
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => handleQuickAction("mastery")}
+              disabled={isLoading}
+            >
+              <Award className="h-3 w-3 mr-1" /> Progress
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="border-t p-4">
