@@ -5,11 +5,10 @@ import { learnAPI, chatAPI } from "@/lib/api"
 import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Upload, Settings, Send, Brain, Sparkles } from "lucide-react"
+import { Settings, Send, Brain, Sparkles } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { UnifiedAIInterface } from "@/components/unified-ai-interface"
@@ -216,60 +215,21 @@ export default function LearnPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {uploadedFiles.length === 0 ? (
-                  <div className="p-8">
-                    {/* Upload Area */}
-                    <div
-                      className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 bg-background/50 ${
-                        isDragOver
-                          ? "border-primary bg-primary/5 scale-105"
-                          : "border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/30"
-                      }`}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                    >
-                      <div className="space-y-4">
-                        <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                          <Upload className="h-8 w-8 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-xl font-medium">Drop your files here</p>
-                          <p className="text-muted-foreground">or click to browse</p>
-                        </div>
-                        <Input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          accept=".pdf"
-                          onChange={(e) => handleFileUpload(e.target.files)}
-                          className="hidden"
-                          id="file-upload"
-                        />
-                        <Label htmlFor="file-upload">
-                          <Button
-                            variant="outline"
-                            className="cursor-pointer bg-transparent"
-                            asChild
-                            disabled={isUploading}
-                          >
-                            <span>{isUploading ? "Processing..." : "Choose Files"}</span>
-                          </Button>
-                        </Label>
-                        <p className="text-sm text-muted-foreground">Supports PDF files only</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <UnifiedAIInterface
-                    files={uploadedFiles}
-                    selectedLevel={appliedExperienceLevel}
-                    selectedFramework={appliedFramework}
-                    currentLessonId={currentLessonId}
-                    conversationId={conversationId}
-                    onConversationIdChange={setConversationId}
-                  />
-                )}
+                <UnifiedAIInterface
+                  files={uploadedFiles}
+                  selectedLevel={appliedExperienceLevel}
+                  selectedFramework={appliedFramework}
+                  currentLessonId={currentLessonId}
+                  conversationId={conversationId}
+                  onConversationIdChange={setConversationId}
+                  onFileUpload={handleFileUpload}
+                  isUploading={isUploading}
+                  isDragOver={isDragOver}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  fileInputRef={fileInputRef}
+                />
               </CardContent>
             </Card>
           </div>

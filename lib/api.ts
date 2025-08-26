@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://trainbackend-production.up.railway.app"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://backendskillspring-production.up.railway.app"
 
 interface ApiResponse<T = any> {
   data?: T
