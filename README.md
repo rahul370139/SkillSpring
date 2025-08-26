@@ -105,7 +105,7 @@ Backend Repo: https://github.com/rahul370139/Backend_skillspring
 - OpenAI API key for AI features
 
 ### Installation
-```bash
+\`\`\`bash
 # Clone the repository
 git clone https://github.com/yourusername/skillspring.git
 
@@ -120,14 +120,14 @@ pnpm dev
 
 # Build for production
 pnpm build
-```
+\`\`\`
 
 ### Environment Variables
-```env
+\`\`\`env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 OPENAI_API_KEY=your_openai_api_key
-```
+\`\`\`
 
 ## 📊 Learning Analytics
 
