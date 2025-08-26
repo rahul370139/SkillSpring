@@ -110,7 +110,7 @@ export default function CareerDiscoverPage() {
             rating: Number.parseInt(rating),
           })),
         })
-        
+
         setCareers(data.career_matches || [])
         setShowResults(true)
       } catch (error) {
@@ -136,29 +136,17 @@ export default function CareerDiscoverPage() {
   const handleGenerateRoadmap = async (careerTitle: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch("https://trainbackend-production.up.railway.app/api/career/roadmap/unified", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          target_role: careerTitle,
-          interests: ["technology", "problem-solving"], // Default interests from quiz
-          skills: [], // Will be determined by the backend based on career
-          user_id: user?.id || "anonymous-user",
-        }),
+      const data = await careerAPI.generateRoadmap({
+        target_role: careerTitle,
+        interests: ["technology", "problem-solving"], // Default interests from quiz
+        skills: [], // Will be determined by the backend based on career
+        user_id: user?.id || "anonymous-user",
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
       console.log("Roadmap generated from quiz:", data)
       setRoadmapData(data)
       setShowRoadmap(true)
       setShowResults(false) // Hide quiz results, show roadmap
-      
     } catch (error) {
       console.error("Failed to generate roadmap from quiz:", error)
       alert("Failed to generate roadmap. Please try again.")
@@ -219,9 +207,9 @@ export default function CareerDiscoverPage() {
                 <Button className="w-full" onClick={() => handleViewProfile(career.career)}>
                   View Career Profile
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent"
                   onClick={() => handleGenerateRoadmap(career.career)}
                 >
                   Generate Roadmap
@@ -273,7 +261,9 @@ export default function CareerDiscoverPage() {
           <Card className="text-center">
             <CardContent className="p-6">
               <Award className="h-8 w-8 mx-auto mb-2 text-purple-500" />
-              <p className="text-2xl font-bold text-primary capitalize">{roadmapData.difficulty_level || "Intermediate"}</p>
+              <p className="text-2xl font-bold text-primary capitalize">
+                {roadmapData.difficulty_level || "Intermediate"}
+              </p>
               <p className="text-sm text-muted-foreground">Difficulty Level</p>
             </CardContent>
           </Card>

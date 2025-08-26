@@ -155,28 +155,29 @@ export const careerAPI = {
     } catch (error) {
       console.warn("Career match API failed, using fallback")
       return {
-        matches: [
+        career_matches: [
           {
-            title: "Software Engineer",
-            match: 85,
-            description: "Build and maintain software applications",
-            skills: ["JavaScript", "React", "Node.js"],
-            salary: "$70,000 - $120,000",
-            growth: "High",
+            career: "Software Engineer",
+            match_score: 85,
+            description: "Build and maintain software applications using various programming languages",
+          },
+          {
+            career: "Data Scientist",
+            match_score: 78,
+            description: "Analyze complex data to help organizations make data-driven decisions",
+          },
+          {
+            career: "UX Designer",
+            match_score: 72,
+            description: "Create intuitive and user-friendly digital experiences",
           },
         ],
       }
     }
   },
 
-  getComprehensiveAnalysis: (data: any) =>
-    apiCall<any>("/api/career/quiz/comprehensive-analysis", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  // Career Roadmaps
-  getCareerRoadmap: (careerTitle: string) => apiCall<any>(`/api/career/roadmap/${careerTitle}`),
+  // Career Roadmaps - Updated endpoints
+  getCareerRoadmap: (careerTitle: string) => apiCall<any>(`/api/career/roadmap/${encodeURIComponent(careerTitle)}`),
 
   getAllRoadmaps: () => apiCall<any[]>("/api/career/roadmaps"),
 
@@ -194,40 +195,38 @@ export const careerAPI = {
     } catch (error) {
       console.warn("Roadmap API failed, using fallback")
       return {
-        roadmap: {
-          title: `${data.target_role} Learning Path`,
-          phases: [
-            {
-              title: "Foundation",
-              duration: "2-3 months",
-              skills: ["HTML", "CSS", "JavaScript"],
-              completed: false,
-            },
-          ],
-        },
+        career_title: data.target_role,
+        total_duration: "6-12 months",
+        difficulty_level: "intermediate",
+        steps: [
+          {
+            step: 1,
+            title: "Foundation Skills",
+            description: `Learn the fundamental skills required for ${data.target_role}`,
+            duration: "2-3 months",
+            skills: data.skills.slice(0, 3),
+            resources: ["Online courses", "Practice projects"],
+          },
+          {
+            step: 2,
+            title: "Intermediate Development",
+            description: "Build practical projects and gain hands-on experience",
+            duration: "3-4 months",
+            skills: data.skills.slice(3, 6),
+            resources: ["Portfolio projects", "Open source contributions"],
+          },
+          {
+            step: 3,
+            title: "Advanced Specialization",
+            description: "Specialize in advanced topics and prepare for job market",
+            duration: "2-3 months",
+            skills: ["Advanced concepts", "Industry best practices"],
+            resources: ["Certification programs", "Networking events"],
+          },
+        ],
       }
     }
   },
-
-  generateEnhancedRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/enhanced", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  generateUnifiedRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/unified", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  generateVisualRoadmap: (data: any) =>
-    apiCall<any>("/api/career/roadmap/visual", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  clearRoadmapCache: () => apiCall<any>("/api/career/roadmap/cache/clear"),
 
   // Career Planning
   generateCareerPlanning: (data: any) =>

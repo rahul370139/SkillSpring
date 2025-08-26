@@ -338,47 +338,83 @@ interface SummaryComponentProps {
 
 export function SummaryComponent({ summary, keyPoints, onAction }: SummaryComponentProps) {
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
+    <Card className="w-full max-w-3xl mx-auto border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
+      <CardHeader className="bg-blue-100 dark:bg-blue-900/30 rounded-t-lg">
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+            <FileText className="h-6 w-6" />
             Document Summary
           </div>
           <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => onAction?.("copy")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onAction?.("copy")}
+              className="hover:bg-blue-200 dark:hover:bg-blue-800"
+            >
               <Copy className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onAction?.("download")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onAction?.("download")}
+              className="hover:bg-blue-200 dark:hover:bg-blue-800"
+            >
               <Download className="h-4 w-4" />
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border-l-4 border-blue-500">
-          <p className="text-sm leading-relaxed">{summary}</p>
+      <CardContent className="space-y-6 p-6">
+        <div className="p-6 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl border-l-4 border-blue-500 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shrink-0 mt-1">
+              <FileText className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Summary Overview</h3>
+              <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {summary}
+              </p>
+            </div>
+          </div>
         </div>
 
         {keyPoints && keyPoints.length > 0 && (
           <>
-            <Separator />
-            <div>
-              <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                Key Points
-              </h4>
-              <ul className="space-y-2">
+            <Separator className="my-6" />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <h4 className="font-semibold text-lg text-green-700 dark:text-green-300">Key Takeaways</h4>
+              </div>
+              <div className="grid gap-3">
                 {keyPoints.map((point, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    <div className="w-2 h-2 bg-green-600 rounded-full mt-2 shrink-0" />
-                    <span>{point}</span>
-                  </li>
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border-l-2 border-green-400"
+                  >
+                    <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">
+                      {index + 1}
+                    </div>
+                    <span className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{point}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </>
         )}
+
+        <Separator className="my-6" />
+        <div className="flex justify-between items-center text-sm text-muted-foreground bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+          <div className="flex items-center gap-4">
+            <span>📖 Reading time: ~2 minutes</span>
+            <span>📝 {summary.split(" ").length} words</span>
+          </div>
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+            Summary Complete
+          </Badge>
+        </div>
       </CardContent>
     </Card>
   )
@@ -428,46 +464,135 @@ interface LessonComponentProps {
 }
 
 export function LessonComponent({ lesson, onAction }: LessonComponentProps) {
+  const parseLessonContent = (lessonData: any) => {
+    if (typeof lessonData === "string") {
+      return {
+        title: "Structured Lesson",
+        content: lessonData,
+        objectives: ["Master the key concepts", "Apply knowledge effectively", "Build practical understanding"],
+        sections: lessonData.split("\n\n").filter((section) => section.trim().length > 0),
+      }
+    }
+
+    if (typeof lessonData === "object" && lessonData !== null) {
+      return {
+        title: lessonData.title || "Structured Lesson",
+        content: lessonData.content || JSON.stringify(lessonData, null, 2),
+        objectives: lessonData.objectives || lessonData.learning_objectives || ["Master the key concepts"],
+        sections: lessonData.sections || [lessonData.content || JSON.stringify(lessonData, null, 2)],
+      }
+    }
+
+    return {
+      title: "Structured Lesson",
+      content: "Lesson content will be displayed here.",
+      objectives: ["Master the key concepts"],
+      sections: ["Lesson content will be displayed here."],
+    }
+  }
+
+  const parsedLesson = parseLessonContent(lesson)
+
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
+    <Card className="w-full max-w-3xl mx-auto border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+      <CardHeader className="bg-green-100 dark:bg-green-900/30 rounded-t-lg">
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-green-600" />
-            Structured Lesson
+          <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+            <BookOpen className="h-6 w-6" />
+            {parsedLesson.title}
           </div>
           <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => onAction?.("copy")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onAction?.("copy")}
+              className="hover:bg-green-200 dark:hover:bg-green-800"
+            >
               <Copy className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onAction?.("download")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onAction?.("download")}
+              className="hover:bg-green-200 dark:hover:bg-green-800"
+            >
               <Download className="h-4 w-4" />
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border-l-4 border-green-500">
-          <h3 className="font-semibold mb-2">Learning Objectives</h3>
-          <p className="text-sm text-muted-foreground">
-            Master the key concepts and apply them effectively in real-world scenarios.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <h4 className="font-semibold">Lesson Content</h4>
-          <div className="prose prose-sm max-w-none">
-            <p className="text-sm leading-relaxed">
-              {typeof lesson === "string" ? lesson : JSON.stringify(lesson, null, 2)}
-            </p>
+      <CardContent className="space-y-6 p-6">
+        <div className="p-6 bg-gradient-to-r from-green-100 to-teal-100 dark:from-green-900/30 dark:to-teal-900/30 rounded-xl border-l-4 border-green-500 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0 mt-1">
+              <Target className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-800 dark:text-green-200 mb-3">Learning Objectives</h3>
+              <ul className="space-y-2">
+                {parsedLesson.objectives.map((objective, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                    <span>{objective}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
-        <Separator />
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="h-5 w-5 text-green-600" />
+            <h4 className="font-semibold text-lg text-green-700 dark:text-green-300">Lesson Content</h4>
+          </div>
 
-        <div className="flex justify-between items-center text-sm text-muted-foreground">
-          <span>Estimated time: 15-20 minutes</span>
-          <Badge variant="outline">Beginner Friendly</Badge>
+          <div className="space-y-4">
+            {parsedLesson.sections.map((section, index) => (
+              <div
+                key={index}
+                className="p-5 bg-white dark:bg-gray-900/50 rounded-lg border border-green-200 dark:border-green-800 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-1">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="prose prose-sm max-w-none">
+                      <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap m-0">
+                        {section}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Separator className="my-6" />
+
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 p-5 rounded-lg border border-green-200 dark:border-green-800">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>⏱️ Estimated time: 15-20 minutes</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>📚 {parsedLesson.sections.length} sections</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                Beginner Friendly
+              </Badge>
+              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                Interactive
+              </Badge>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
