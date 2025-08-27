@@ -40,17 +40,52 @@ export const healthAPI = {
 // Learn Page Endpoints
 export const learnAPI = {
   // PDF Processing & Lesson Management
-  distill: (file: File, ownerId: string) => {
+  distill: async (file: File, ownerId: string, explanationLevel?: string, framework?: string) => {
+    console.log("[v0] Starting distill upload with:", {
+      fileName: file.name,
+      fileSize: file.size,
+      ownerId,
+      explanationLevel,
+      framework,
+    })
+
     const formData = new FormData()
     formData.append("file", file)
+    formData.append("owner_id", ownerId)
 
-    return fetch(`${API_BASE_URL}/api/distill?owner_id=${ownerId}`, {
-      method: "POST",
-      body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Distill failed: ${res.status}`)
-      return res.json()
-    })
+    if (explanationLevel) {
+      formData.append("explanation_level", explanationLevel)
+    }
+    if (framework) {
+      formData.append("framework", framework)
+    }
+
+    const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL
+    const url = `${baseUrl}/api/distill`
+    console.log("[v0] Making request to:", url)
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData,
+      })
+
+      console.log("[v0] Response status:", response.status)
+      console.log("[v0] Response headers:", Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log("[v0] Error response body:", errorText)
+        throw new Error(`Distill failed: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] Success response:", result)
+      return result
+    } catch (error) {
+      console.error("[v0] Distill request failed:", error)
+      throw error
+    }
   },
 
   getLessonContent: (lessonId: string, action: string) => apiCall<any>(`/api/lesson/${lessonId}/${action}`),
@@ -61,10 +96,9 @@ export const learnAPI = {
       body: JSON.stringify(data),
     }),
 
-  getLessonSummary: (data: any) =>
-    apiCall<any>("/api/chat/lesson/summary", {
+  getLessonSummary: (lessonId: number, userId: string) =>
+    apiCall<any>(`/api/chat/lesson/summary?lesson_id=${lessonId}&user_id=${encodeURIComponent(userId)}`, {
       method: "POST",
-      body: JSON.stringify(data),
     }),
 
   getLessonContentForChat: (lessonId: string, userId: string) =>
@@ -74,11 +108,16 @@ export const learnAPI = {
   getFrameworks: () => apiCall<string[]>("/api/frameworks"),
   getSkills: () => apiCall<string[]>("/api/skills"),
   getExplanationLevels: () => apiCall<string[]>("/api/explanation-levels"),
-  getLessonsByFramework: (framework: string) => apiCall<any[]>(`/api/lessons/framework/${framework}`),
+  getLessonsByFramework: (framework: string, limit = 10) =>
+    apiCall<any[]>(`/api/lessons/framework/${framework}?limit=${limit}`),
 
   // Micro Lessons
-  getMicroLessons: () => apiCall<any[]>("/api/lessons/micro"),
-  searchLessons: (query: any) =>
+  getMicroLessons: (category?: string) => {
+    const params = category ? `?category=${encodeURIComponent(category)}` : ""
+    return apiCall<any[]>(`/api/lessons/micro${params}`)
+  },
+
+  searchLessons: (query: { query: string }) =>
     apiCall<any>("/api/lessons/search", {
       method: "POST",
       body: JSON.stringify(query),
@@ -86,55 +125,28 @@ export const learnAPI = {
 
   // User Progress
   completeLesson: (lessonId: string, userId: string, progressPercentage = 100.0) =>
-    apiCall<any>(`/api/lessons/${lessonId}/complete`, {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: userId,
-        progress_percentage: progressPercentage,
-      }),
-    }),
+    apiCall<any>(
+      `/api/lessons/${lessonId}/complete?user_id=${encodeURIComponent(userId)}&progress_percentage=${progressPercentage}`,
+      {
+        method: "POST",
+      },
+    ),
 
   getCompletedLessons: (userId: string) => apiCall<any[]>(`/api/users/${userId}/completed-lessons`),
 
   getUserProgress: (userId: string) => apiCall<any>(`/api/users/${userId}/progress`),
 
-  // File upload for learn page
-  uploadFile: async (file: File) => {
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-
-      return await apiCall("/api/learn/upload", {
-        method: "POST",
-        body: formData,
-        headers: {}, // Let browser set Content-Type for FormData
-      })
-    } catch (error) {
-      console.warn("File upload API failed")
-      return { success: false, error: "Upload failed" }
-    }
+  uploadFile: async (file: File, userId: string, conversationId?: string, explanationLevel?: string) => {
+    return chatAPI.uploadFile(file, userId, conversationId, explanationLevel)
   },
 
-  // Chat functionality for learn page
   chat: async (data: {
     message: string
     user_id: string
-    file_id?: string
-    experience_level?: string
-    framework_focus?: string
+    conversation_id?: string
+    explanation_level?: string
   }) => {
-    try {
-      return await apiCall("/api/learn/chat", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
-    } catch (error) {
-      console.warn("Chat API failed, using fallback response")
-      return {
-        response: "I'm currently experiencing technical difficulties. Please try again later.",
-        type: "text",
-      }
-    }
+    return chatAPI.sendMessage(data)
   },
 }
 
@@ -144,8 +156,9 @@ export const careerAPI = {
   getCareerQuiz: () => apiCall<any>("/api/career/quiz"),
 
   matchCareer: async (data: {
-    user_id: string
-    answers: Array<{ question_id: number; rating: number }>
+    owner_id: string
+    answers: number[]
+    user_profile?: any
   }) => {
     try {
       return await apiCall("/api/career/match", {
@@ -155,26 +168,47 @@ export const careerAPI = {
     } catch (error) {
       console.warn("Career match API failed, using fallback")
       return {
-        career_matches: [
+        results: [
           {
-            career: "Software Engineer",
-            match_score: 85,
-            description: "Build and maintain software applications using various programming languages",
+            title: "Software Engineer",
+            salary_low: 70000,
+            salary_high: 120000,
+            growth_pct: 22,
+            common_skills: ["JavaScript", "React", "Node.js"],
+            day_in_life: "Build and maintain software applications using various programming languages",
+            similarity: 0.85,
           },
           {
-            career: "Data Scientist",
-            match_score: 78,
-            description: "Analyze complex data to help organizations make data-driven decisions",
+            title: "Data Scientist",
+            salary_low: 80000,
+            salary_high: 140000,
+            growth_pct: 35,
+            common_skills: ["Python", "Machine Learning", "Statistics"],
+            day_in_life: "Analyze complex data to help organizations make data-driven decisions",
+            similarity: 0.78,
           },
           {
-            career: "UX Designer",
-            match_score: 72,
-            description: "Create intuitive and user-friendly digital experiences",
+            title: "UX Designer",
+            salary_low: 60000,
+            salary_high: 100000,
+            growth_pct: 18,
+            common_skills: ["Design Thinking", "Figma", "User Research"],
+            day_in_life: "Create intuitive and user-friendly digital experiences",
+            similarity: 0.72,
           },
         ],
       }
     }
   },
+
+  getComprehensiveCareerAnalysis: (data: {
+    answers: number[]
+    user_skills?: string[]
+  }) =>
+    apiCall<any>("/api/career/quiz/comprehensive-analysis", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   // Career Roadmaps - Updated endpoints
   getCareerRoadmap: (careerTitle: string) => apiCall<any>(`/api/career/roadmap/${encodeURIComponent(careerTitle)}`),
@@ -182,10 +216,10 @@ export const careerAPI = {
   getAllRoadmaps: () => apiCall<any[]>("/api/career/roadmaps"),
 
   generateRoadmap: async (data: {
-    target_role: string
-    interests: string[]
-    skills: string[]
-    user_id: string
+    user_profile?: any
+    target_role?: string
+    user_skills?: string[]
+    user_interests?: string[]
   }) => {
     try {
       return await apiCall("/api/career/roadmap/unified", {
@@ -195,41 +229,57 @@ export const careerAPI = {
     } catch (error) {
       console.warn("Roadmap API failed, using fallback")
       return {
-        career_title: data.target_role,
-        total_duration: "6-12 months",
-        difficulty_level: "intermediate",
-        steps: [
-          {
-            step: 1,
+        target_role: data.target_role || "Software Developer",
+        roadmap: {
+          foundational: {
             title: "Foundation Skills",
-            description: `Learn the fundamental skills required for ${data.target_role}`,
+            description: "Learn the fundamental skills required",
+            skills: data.user_skills?.slice(0, 3) || ["HTML", "CSS", "JavaScript"],
             duration: "2-3 months",
-            skills: data.skills.slice(0, 3),
-            resources: ["Online courses", "Practice projects"],
+            salary_range: "$50k - $70k",
+            responsibilities: ["Learn basics", "Build simple projects"],
+            learning_objectives: ["Understand core concepts", "Practice coding"],
+            recommended_lessons: [],
+            skill_gaps: [],
           },
-          {
-            step: 2,
+          intermediate: {
             title: "Intermediate Development",
             description: "Build practical projects and gain hands-on experience",
+            skills: data.user_skills?.slice(3, 6) || ["React", "Node.js", "Database"],
             duration: "3-4 months",
-            skills: data.skills.slice(3, 6),
-            resources: ["Portfolio projects", "Open source contributions"],
+            salary_range: "$70k - $90k",
+            responsibilities: ["Build complex projects", "Work in teams"],
+            learning_objectives: ["Master frameworks", "Understand architecture"],
+            recommended_lessons: [],
+            skill_gaps: [],
           },
-          {
-            step: 3,
+          advanced: {
             title: "Advanced Specialization",
             description: "Specialize in advanced topics and prepare for job market",
+            skills: ["System Design", "Advanced Patterns", "Leadership"],
             duration: "2-3 months",
-            skills: ["Advanced concepts", "Industry best practices"],
-            resources: ["Certification programs", "Networking events"],
+            salary_range: "$90k - $120k",
+            responsibilities: ["Lead projects", "Mentor others"],
+            learning_objectives: ["Master advanced concepts", "Develop leadership"],
+            recommended_lessons: [],
+            skill_gaps: [],
           },
-        ],
+        },
+        interview_preparation: {},
+        market_insights: {},
+        learning_plan: {},
+        coaching_advice: {},
+        confidence_score: 0.8,
+        timeline: {},
+        estimated_time_to_target: {},
       }
     }
   },
 
-  // Career Planning
-  generateCareerPlanning: (data: any) =>
+  generateCareerPlanning: (data: {
+    interests: string[]
+    skills: string[]
+  }) =>
     apiCall<any>("/api/career/planning", {
       method: "POST",
       body: JSON.stringify(data),
@@ -237,7 +287,12 @@ export const careerAPI = {
 
   getCareerPlanningOptions: () => apiCall<any>("/api/career/planning/options"),
 
-  generateComprehensivePlan: (data: any) =>
+  generateComprehensivePlan: (data: {
+    user_profile: any
+    target_role?: string
+    user_skills?: string[]
+    user_interests?: string[]
+  }) =>
     apiCall<any>("/api/career/comprehensive-plan", {
       method: "POST",
       body: JSON.stringify(data),
@@ -245,14 +300,29 @@ export const careerAPI = {
 
   getAvailableCareers: () => apiCall<string[]>("/api/career/available"),
 
-  // Career Guidance & Advice
-  getCareerGuidance: (data: any) =>
+  generateEnhancedRoadmap: (data: {
+    career_title: string
+    user_skills: string[]
+  }) =>
+    apiCall<any>("/api/career/roadmap/enhanced", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getCareerGuidance: (data: {
+    user_id: string
+    user_profile: any
+    query: string
+  }) =>
     apiCall<any>("/api/career/guidance", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  getCareerAdvice: (data: any) =>
+  getCareerAdvice: (data: {
+    topic: string
+    user_context?: any
+  }) =>
     apiCall<any>("/api/career/advice", {
       method: "POST",
       body: JSON.stringify(data),
@@ -260,14 +330,20 @@ export const careerAPI = {
 
   getCareerAdviceTopics: () => apiCall<string[]>("/api/career/advice/topics"),
 
-  // Interview Preparation
-  startInterviewSimulation: (data: any) =>
+  startInterviewSimulation: (data: {
+    user_id: string
+    target_role: string
+    difficulty?: string
+  }) =>
     apiCall<any>("/api/career/interview/start", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  submitInterviewAnswer: (data: any) =>
+  submitInterviewAnswer: (data: {
+    session_id: string
+    answer: string
+  }) =>
     apiCall<any>("/api/career/interview/answer", {
       method: "POST",
       body: JSON.stringify(data),
@@ -275,14 +351,27 @@ export const careerAPI = {
 
   getInterviewRoles: () => apiCall<string[]>("/api/career/interview/roles"),
 
-  generateInterviewPrep: (data: any) =>
+  generateInterviewPrep: (data: {
+    target_role: string
+    user_profile?: any
+  }) =>
     apiCall<any>("/api/career/roadmap/interview-prep", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  // Career Sessions
   getUserCareerSessions: (userId: string) => apiCall<any[]>(`/api/career/sessions/${userId}`),
+
+  generateVisualRoadmap: (data: {
+    target_role: string
+    user_skills: string[]
+    user_experience: string
+    include_visual?: boolean
+  }) =>
+    apiCall<any>("/api/career/roadmap/visual", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 }
 
 // Chat Page Endpoints
@@ -340,7 +429,7 @@ export const chatAPI = {
 // Agentic AI Endpoints
 export const agenticAPI = {
   // Intent Detection & Routing
-  routeMessage: (data: { message: string; pdf_id?: string; user_id?: string }) =>
+  routeMessage: (data: any) =>
     apiCall<{
       intent: string
       confidence: number
@@ -353,7 +442,7 @@ export const agenticAPI = {
     }),
 
   // Summary Agent
-  generateSummary: (data: { pdf_id: string; user_id: string; topic?: string }) =>
+  generateSummary: (data: any) =>
     apiCall<{
       summary: string
       concept_map: any
@@ -365,7 +454,7 @@ export const agenticAPI = {
     }),
 
   // Diagnostic Agent
-  startDiagnostic: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
+  startDiagnostic: (data: any) =>
     apiCall<{
       questions: Array<{
         question: string
@@ -380,17 +469,7 @@ export const agenticAPI = {
       body: JSON.stringify(data),
     }),
 
-  processDiagnosticResults: (data: {
-    pdf_id: string
-    user_id: string
-    topic?: string
-    user_answers: Array<{
-      question_index: number
-      selected_answer: string
-      is_correct: boolean
-    }>
-    session_id: string
-  }) =>
+  processDiagnosticResults: (data: any) =>
     apiCall<{
       status: string
       results: {
@@ -405,9 +484,8 @@ export const agenticAPI = {
       body: JSON.stringify(data),
     }),
 
-  // Mastery Tracking - with proper error handling for anonymous users
+  // Mastery Tracking
   getMastery: async (userId: string, topic?: string) => {
-    // Don't make API call for anonymous users
     if (!userId || userId === "anonymous-user" || userId === "anonymous") {
       return {
         status: "success",
@@ -434,7 +512,6 @@ export const agenticAPI = {
         }
       }>(url)
     } catch (error) {
-      // Return default mastery data if API fails
       console.warn("Failed to fetch mastery data, returning defaults:", error)
       return {
         status: "success",
@@ -450,87 +527,43 @@ export const agenticAPI = {
   },
 
   // Content Generation
-  generateWorkflow: (data: { pdf_id: string; user_id: string; topic?: string }) =>
-    apiCall<{
-      workflow: Array<{
-        step: number
-        action: string
-        description: string
-        estimated_time?: string
-        resources?: string[]
-      }>
-      total_steps: number
-      estimated_duration: string
-      difficulty_level: string
-    }>("/api/agent/workflow", {
+  generateWorkflow: (data: any) =>
+    apiCall<any>("/api/generate/workflow", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  generateFlashcards: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
-    apiCall<{
-      flashcards: Array<{
-        front: string
-        back: string
-      }>
-      total_cards: number
-      difficulty_level: string
-    }>("/api/agent/flashcards", {
+  generateFlashcards: (data: any) =>
+    apiCall<any>("/api/generate/flashcards", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  generateQuiz: (data: { pdf_id: string; user_id: string; topic?: string; num?: number }) =>
-    apiCall<{
-      questions: Array<{
-        question: string
-        options: string[]
-        correct_answer: string
-        explanation?: string
-      }>
-      total_questions: number
-      difficulty_level: string
-    }>("/api/agent/quiz", {
+  generateQuiz: (data: any) =>
+    apiCall<any>("/api/generate/quiz", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  generateLesson: (data: any) =>
+    apiCall<any>("/api/generate/lesson", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   generateContent: async (data: {
-    pdf_id: string
-    user_id: string
     content_type: "lesson" | "quiz" | "flashcards" | "workflow"
-    topic?: string
-    difficulty?: string
+    [key: string]: any
   }) => {
-    // Route to appropriate content generation endpoint
     switch (data.content_type) {
       case "quiz":
-        return agenticAPI.generateQuiz({
-          pdf_id: data.pdf_id,
-          user_id: data.user_id,
-          topic: data.topic,
-          num: 10,
-        })
+        return agenticAPI.generateQuiz(data)
       case "flashcards":
-        return agenticAPI.generateFlashcards({
-          pdf_id: data.pdf_id,
-          user_id: data.user_id,
-          topic: data.topic,
-          num: 15,
-        })
+        return agenticAPI.generateFlashcards(data)
       case "workflow":
-        return agenticAPI.generateWorkflow({
-          pdf_id: data.pdf_id,
-          user_id: data.user_id,
-          topic: data.topic,
-        })
+        return agenticAPI.generateWorkflow(data)
       case "lesson":
-        // For lesson generation, we'll use the learn API
-        return learnAPI.generateLessonContent(data.pdf_id, "lesson", {
-          user_id: data.user_id,
-          difficulty: data.difficulty,
-          topic: data.topic,
-        })
+        return agenticAPI.generateLesson(data)
       default:
         throw new Error(`Unsupported content type: ${data.content_type}`)
     }
@@ -539,13 +572,23 @@ export const agenticAPI = {
   // System Testing
   testSystem: () => apiCall<{ status: string; message: string }>("/api/agent/test"),
 
-  // Additional methods for agentic interface
+  ingestPdf: (file: File, userId: string) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("user_id", userId)
+
+    return fetch(`${API_BASE_URL}/api/ingest/pdf`, {
+      method: "POST",
+      body: formData,
+    }).then((res) => {
+      if (!res.ok) throw new Error(`PDF ingestion failed: ${res.status}`)
+      return res.json()
+    })
+  },
+
   detectIntent: async (data: { message: string; user_id: string }) => {
     try {
-      return await apiCall("/api/agent/intent", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      return await agenticAPI.routeMessage(data)
     } catch (error) {
       return { intent: "general", confidence: 0.5 }
     }
@@ -553,10 +596,7 @@ export const agenticAPI = {
 
   runDiagnostic: async (data: { topic: string; user_id: string }) => {
     try {
-      return await apiCall("/api/agent/diagnostic", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      return await agenticAPI.startDiagnostic(data)
     } catch (error) {
       return {
         diagnostic: {
@@ -572,28 +612,57 @@ export const agenticAPI = {
 // Dashboard Page Endpoints
 export const dashboardAPI = {
   // Dashboard Analytics
-  getUserAnalytics: (userId: string) => apiCall<any>(`/api/dashboard/analytics/${userId}`),
+  getUserAnalytics: (userId: string, timePeriod = "30d") =>
+    apiCall<any>(`/api/dashboard/analytics/${userId}?time_period=${timePeriod}`),
 
   getUserProgress: (userId: string) => apiCall<any>(`/api/dashboard/progress/${userId}`),
 
   getUserAchievements: (userId: string) => apiCall<any>(`/api/dashboard/achievements/${userId}`),
 
-  // Dashboard Recommendations
-  getDashboardRecommendations: (data: any) =>
-    apiCall<any>("/api/dashboard/recommendations", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  getDashboardRecommendations: (
+    userId: string,
+    targetRole?: string,
+    data?: {
+      user_profile?: any
+      user_skills?: string[]
+      user_interests?: string[]
+    },
+  ) =>
+    apiCall<any>(
+      `/api/dashboard/recommendations?user_id=${encodeURIComponent(userId)}${targetRole ? `&target_role=${encodeURIComponent(targetRole)}` : ""}`,
+      {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      },
+    ),
 
-  getCareerCoaching: (data: any) =>
-    apiCall<any>("/api/dashboard/coaching", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  getCareerCoaching: (
+    userId: string,
+    targetRole?: string,
+    data?: {
+      user_profile?: any
+      current_challenges?: string[]
+    },
+  ) =>
+    apiCall<any>(
+      `/api/dashboard/coaching?user_id=${encodeURIComponent(userId)}${targetRole ? `&target_role=${encodeURIComponent(targetRole)}` : ""}`,
+      {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      },
+    ),
 
   getStats: async (userId: string) => {
     try {
-      return await apiCall(`/api/dashboard/stats/${userId}`)
+      const progress = await apiCall(`/api/dashboard/progress/${userId}`)
+      return {
+        stats: {
+          lessonsCompleted: progress.lessons_completed || 0,
+          hoursLearned: progress.hours_spent || 0,
+          skillsAcquired: progress.skills_learned || 0,
+          certificatesEarned: progress.certificates_earned || 0,
+        },
+      }
     } catch (error) {
       return {
         stats: {
@@ -623,7 +692,10 @@ export const dashboardAPI = {
 
   getRecentActivity: async (userId: string) => {
     try {
-      return await apiCall(`/api/dashboard/activity/${userId}`)
+      const progress = await apiCall(`/api/dashboard/progress/${userId}`)
+      return {
+        activities: progress.recent_activity || [],
+      }
     } catch (error) {
       return {
         activities: [],
@@ -634,10 +706,18 @@ export const dashboardAPI = {
 
 // User Management Endpoints
 export const userAPI = {
-  updateUserRole: (userId: string, role: string) =>
+  updateUserRole: (
+    userId: string,
+    data: {
+      user_id: string
+      role: string
+      experience_level: string
+      interests?: string[]
+    },
+  ) =>
     apiCall<any>(`/api/users/${userId}/role`, {
       method: "PUT",
-      body: JSON.stringify({ role }),
+      body: JSON.stringify(data),
     }),
 
   getUserRole: (userId: string) => apiCall<any>(`/api/users/${userId}/role`),

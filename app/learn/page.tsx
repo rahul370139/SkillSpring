@@ -13,16 +13,18 @@ import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { UnifiedAIInterface } from "@/components/unified-ai-interface"
 
-async function uploadToDistill(file: File, ownerId: string) {
+async function uploadToDistill(file: File, ownerId: string, explanationLevel?: string, framework?: string) {
   console.log("uploadToDistill called with:", {
     fileName: file.name,
     fileSize: file.size,
     fileType: file.type,
     ownerId,
+    explanationLevel,
+    framework,
   })
 
   try {
-    const data = await learnAPI.distill(file, ownerId)
+    const data = await learnAPI.distill(file, ownerId, explanationLevel, framework)
     console.log("Distill upload successful, response:", data)
     return data
   } catch (error) {
@@ -118,8 +120,12 @@ export default function LearnPage() {
             ? "intern"
             : "senior"
 
-      // Upload to distill for lesson processing
-      const distillResp = await uploadToDistill(supportedFiles[0], user?.id || "anonymous-user")
+      const distillResp = await uploadToDistill(
+        supportedFiles[0],
+        user?.id || "anonymous-user",
+        explanationLevel,
+        appliedFramework,
+      )
       console.log("Distill response:", distillResp)
 
       // Upload to chat for conversation context
