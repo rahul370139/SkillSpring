@@ -51,17 +51,20 @@ export const learnAPI = {
 
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("owner_id", ownerId)
+
+    // Build query parameters
+    const params = new URLSearchParams()
+    params.append("owner_id", ownerId)
 
     if (explanationLevel) {
-      formData.append("explanation_level", explanationLevel)
+      params.append("explanation_level", explanationLevel)
     }
     if (framework) {
-      formData.append("framework", framework)
+      params.append("framework", framework)
     }
 
     const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL
-    const url = `${baseUrl}/api/distill`
+    const url = `${baseUrl}/api/distill?${params.toString()}`
     console.log("[v0] Making request to:", url)
 
     try {
@@ -377,33 +380,89 @@ export const careerAPI = {
 // Chat Page Endpoints
 export const chatAPI = {
   // Chat Functionality
-  sendMessage: (data: any) =>
-    apiCall<any>("/api/chat", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  sendMessage: async (data: any) => {
+    console.log("[v0] Starting chat message with:", data)
 
-  uploadFile: (file: File, userId: string, conversationId?: string, explanationLevel?: string) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    if (conversationId) formData.append("conversation_id", conversationId)
+    const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL
+    const url = `${baseUrl}/api/chat`
+    console.log("[v0] Making chat request to:", url)
 
-    const url = `${API_BASE_URL}/api/chat/upload?user_id=${encodeURIComponent(userId)}${explanationLevel ? `&explanation_level=${encodeURIComponent(explanationLevel)}` : ""}`
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
 
-    return fetch(url, {
-      method: "POST",
-      body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
-      return res.json()
-    })
+      console.log("[v0] Chat response status:", response.status)
+      console.log("[v0] Chat response headers:", Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log("[v0] Chat error response body:", errorText)
+        throw new Error(`API Error ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] Chat success response:", result)
+      return result
+    } catch (error) {
+      console.error("[v0] Chat request failed:", error)
+      throw error
+    }
   },
 
-  ingestDistilled: (lessonId: string, userId: string, data: any) =>
-    apiCall<any>(`/api/chat/ingest-distilled?lesson_id=${lessonId}&user_id=${encodeURIComponent(userId)}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  uploadFile: async (file: File, userId: string, conversationId?: string, explanationLevel?: string) => {
+    console.log("[v0] Starting chat upload with:", {
+      fileName: file.name,
+      fileSize: file.size,
+      userId,
+      conversationId,
+      explanationLevel,
+    })
+
+    const formData = new FormData()
+    formData.append("file", file)
+    if (conversationId) {
+      formData.append("conversation_id", conversationId)
+    }
+
+    // Build query parameters
+    const params = new URLSearchParams()
+    params.append("user_id", userId)
+    if (explanationLevel) {
+      params.append("explanation_level", explanationLevel)
+    }
+
+    const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL
+    const url = `${baseUrl}/api/chat/upload?${params.toString()}`
+    console.log("[v0] Making chat upload request to:", url)
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData,
+      })
+
+      console.log("[v0] Chat upload response status:", response.status)
+      console.log("[v0] Chat upload response headers:", Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log("[v0] Chat upload error response body:", errorText)
+        throw new Error(`Upload failed: ${response.status}${errorText ? ` - ${errorText}` : ""}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] Chat upload success response:", result)
+      return result
+    } catch (error) {
+      console.error("[v0] Chat upload request failed:", error)
+      throw error
+    }
+  },
 
   // Chat Management
   getUserConversations: (userId: string) => apiCall<any[]>(`/api/chat/conversations/${userId}`),

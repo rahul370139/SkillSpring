@@ -49,9 +49,9 @@ async function uploadFileForChat(file: File, userId: string, conversationId: str
 export default function LearnPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [experienceLevel, setExperienceLevel] = useState("intermediate")
-  const [framework, setFramework] = useState("general")
+  const [framework, setFramework] = useState("generic")
   const [appliedExperienceLevel, setAppliedExperienceLevel] = useState("intermediate")
-  const [appliedFramework, setAppliedFramework] = useState("general")
+  const [appliedFramework, setAppliedFramework] = useState("generic")
   const [isDragOver, setIsDragOver] = useState(false)
   const [currentLessonId, setCurrentLessonId] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -136,19 +136,6 @@ export default function LearnPage() {
         explanationLevel,
       )
       console.log("Chat upload response:", chatUploadResp)
-
-      // Ingest distilled content into chat
-      if (distillResp.lesson_id && chatUploadResp.conversation_id) {
-        try {
-          await chatAPI.ingestDistilled(distillResp.lesson_id.toString(), user?.id || "anonymous-user", {
-            conversation_id: chatUploadResp.conversation_id,
-            explanation_level: explanationLevel,
-            framework: appliedFramework,
-          })
-        } catch (error) {
-          console.warn("Error ingesting lesson content:", error)
-        }
-      }
 
       // Update state
       setUploadedFiles([supportedFiles[0]])
@@ -286,7 +273,7 @@ export default function LearnPage() {
                       <SelectValue placeholder="Select framework" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="generic">General</SelectItem>
                       <SelectItem value="react">React</SelectItem>
                       <SelectItem value="python">Python</SelectItem>
                       <SelectItem value="nodejs">Node.js</SelectItem>
